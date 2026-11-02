@@ -6,6 +6,8 @@ All notable changes to this project are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-02
+
 ### Fixed
 - Wrong diagnosis: `mcu-command-request` fired on any shutdown, because every MCU reports "Command request" after the host stops it. It now fires only when an emergency stop was the event, and says where it came from. The real cause, or the raw reason, is shown instead.
 - Wrong diagnosis: errors logged after the first shutdown, and text quoted in the request dumps, could add findings or name the wrong MCU. Rules now look only at what came before the shutdown and at the reason Klipper gave.
@@ -40,4 +42,5 @@ First release.
 - Library export: `analyze`, `toMarkdown`, `toText` and `rulesMetadata`. ESM, zero runtime dependencies, runs in Node and in the browser.
 - Every rule cites the Klipper docs or source it comes from, and the README rule table is generated from the rules' own metadata.
 
+[0.2.0]: https://github.com/kd-011/klipper-doctor/releases/tag/v0.2.0
 [0.1.0]: https://github.com/kd-011/klipper-doctor/releases/tag/v0.1.0

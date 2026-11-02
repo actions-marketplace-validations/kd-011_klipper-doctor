@@ -20,7 +20,7 @@ Or install it: `npm i -g klipper-doctor`. Node 18 or newer. It also runs in your
 
 ## What it catches
 
-Klipper's own messages are terse. These are real outputs, from test logs built out of the message formats in the Klipper source (never from anyone's real log).
+Klipper's own messages are terse. These are real outputs from test logs built from the message formats in the Klipper source. None of them is anyone's real log.
 
 **Lost communication**
 
@@ -95,9 +95,9 @@ Every finding also carries the line numbers it came from and a link to the Klipp
 
 ## How it differs
 
-There are good tools for looking at a `klippy.log` already. [Klipper Log Visualizer](https://klipper.discourse.group/t/klipper-log-visualizer/24281) by Sineos graphs the data in a log in the browser, and [klipper_logs](https://coderus.openrepos.net/klipper_logs/) by CODeRUS collects and graphs logs too. Klipper itself ships `scripts/logextract.py` for pulling the config and shutdown information out of a log. For the config side, [klipper-cfg-linter](https://github.com/chexxor/klipper-cfg-linter) by chexxor is an early project with the same aim as the config report here.
+Good tools for looking at a `klippy.log` already exist. [Klipper Log Visualizer](https://klipper.discourse.group/t/klipper-log-visualizer/24281) by Sineos graphs the data in a log in the browser, and [klipper_logs](https://coderus.openrepos.net/klipper_logs/) by CODeRUS collects and graphs logs too. Klipper itself ships `scripts/logextract.py` for pulling the config and shutdown information out of a log. For the config side, [klipper-cfg-linter](https://github.com/chexxor/klipper-cfg-linter) by chexxor is an early project with the same aim as the config report here.
 
-klipper-doctor is a companion to those, not a replacement: use a grapher to see what the temperatures and the load did, and use this to get the cause and the fix in words, plus a lint of the config.
+Use a grapher to see what the temperatures and the load did. Use klipper-doctor to get the cause and the fix in words, plus a lint of the config.
 
 ## Use it
 
@@ -112,7 +112,7 @@ cat klippy.log | klipper-doctor -    # read stdin
 
 Exit code is 1 when any finding is an error, 0 otherwise, and 2 for a usage or read error.
 
-Klipper writes the parsed config into `klippy.log` at the start of every run, so one log gives you both reports. When the log holds several Klipper starts, the last one is analysed and the count is reported. If the last one is clean, the report names the latest earlier session that failed, since Klipper has often been restarted before the log was grabbed.
+Klipper writes the parsed config into `klippy.log` at the start of every run, so one log gives you both reports. When the log holds several Klipper starts, the last one is analysed and the count is reported. If the last one is clean, the report names the latest earlier session that failed, because Klipper has often been restarted by the time you grab the log.
 
 ### Several files
 
@@ -138,7 +138,7 @@ Many printer hosts have no Node. Give klipper-doctor the address of Moonraker an
 klipper-doctor http://voron.local:7125
 ```
 
-If Moonraker asks for authentication, put an API key in an environment variable and add `--api-key`. The key is read from `MOONRAKER_API_KEY`, or from the variable you name with `--api-key=VAR`. It is sent as the `X-Api-Key` header to that address only, is never printed, and is not sent unless `--api-key` is there. Redirects are reported rather than followed, so the key cannot be passed on to another host. Alternatively add your computer to `trusted_clients` in the `[authorization]` section of `moonraker.conf`.
+If Moonraker wants authentication, put an API key in an environment variable and add `--api-key`. The key comes from `MOONRAKER_API_KEY`, or from the variable you name with `--api-key=VAR`. It goes to that address only, as the `X-Api-Key` header, and only when `--api-key` is given. It is never printed. Redirects are reported and not followed, so the key can't reach another host. You can also add your computer to `trusted_clients` in the `[authorization]` section of `moonraker.conf`.
 
 ```sh
 MOONRAKER_API_KEY=... klipper-doctor --api-key https://printer.example.net
@@ -165,7 +165,7 @@ jobs:
           ignore: no-input-shaper         # optional, comma separated
 ```
 
-The step fails when a finding is an error. It runs the build committed in the repository, so there is nothing to install, and it needs Node 18 or newer (GitHub's runners have it). Use a release tag instead of `main` once a release that includes `action.yml` is out.
+The step fails when a finding is an error. It runs the build committed in the repository, so there is nothing to install. It needs Node 18 or newer, which GitHub's runners have. Once a release includes `action.yml`, pin to its tag instead of `main`.
 
 ### With pre-commit
 
@@ -182,7 +182,7 @@ The hook checks the `.cfg` files in the commit and blocks it when a finding is a
 
 ### Silencing a finding
 
-For one run: `--ignore duplicate-option,no-input-shaper`. A rule id that does not exist is an error, so a typo cannot hide nothing quietly.
+For one run: `--ignore duplicate-option,no-input-shaper`. An unknown rule id is an error, so a typo can't quietly do nothing.
 
 For one place in a `printer.cfg`, put a comment on the line or in the comment lines directly above it, the way ShellCheck does:
 
@@ -279,11 +279,11 @@ Every rule is taken from the Klipper docs or source. The crash rules match messa
 | `unusable-input` | config | error | Not a Klipper log or config | [docs](https://www.klipper3d.org/FAQ.html) |
 <!-- rules:end -->
 
-Message strings were checked against Klipper's `master` branch on 2026-11-02. Older Klipper versions can word a message differently, and the tool says so when a rule does not match rather than guessing.
+Message strings were checked against Klipper's `master` branch on 2026-11-02. Older Klipper versions can word a message differently, and the tool says so when no rule matches, instead of guessing.
 
 ## In the browser
 
-The same engine runs at [hotend.app/klipper-doctor](https://hotend.app/klipper-doctor), free and with no signup. The analysis happens in your browser. The log is not uploaded and not stored.
+The same engine runs at [hotend.app/klipper-doctor](https://hotend.app/klipper-doctor), free and with no signup. The analysis happens in your browser. The log is not uploaded or stored.
 
 The CLI is the same: it reads the file you name and prints the result. Given a Moonraker URL it makes one request to that address, and nothing else is sent anywhere.
 
@@ -295,13 +295,13 @@ The CLI is the same: it reads the file you name and prints the result. Given a M
 
 ## Contributing
 
-Wrong diagnosis, or a rule you want? Open an issue with a redacted log snippet or a docs link. To add a rule yourself, see [CONTRIBUTING.md](CONTRIBUTING.md): a rule is a small object, and the one hard requirement is a Klipper docs page or source file behind it. No source, no rule.
+Wrong diagnosis, or a rule you want? Open an issue with a redacted log snippet or a docs link. To add a rule yourself, see [CONTRIBUTING.md](CONTRIBUTING.md): a rule is a small object, and the one hard requirement is a Klipper docs page or source file behind it.
 
-Releases are automatic: merging a pull request that raises the version in `package.json` publishes it to npm and creates the GitHub Release, with notes from [CHANGELOG.md](CHANGELOG.md). The steps are in CONTRIBUTING.md.
+Merging a pull request that raises the version in `package.json` publishes it to npm and creates the GitHub Release, with notes from [CHANGELOG.md](CHANGELOG.md). The steps are in CONTRIBUTING.md.
 
 ## Built by Hotend
 
-Built by [Hotend](https://hotend.app), which watches your printer from your phone and catches failures live.
+[Hotend](https://hotend.app) watches your printer from your phone and catches failures live.
 
 ## Licence
 

@@ -19,7 +19,7 @@ All notable changes to this project are listed here. The format follows
 - `klipper-doctor completions bash|zsh|fish` prints a completion script. `--help` and the scripts are generated from one option table, and a test checks they agree.
 
 ### Changed
-- Releases are automatic. `publish.yml` no longer waits for a tag: when a push to `main` changes `package.json` to a version npm does not have, it runs the checks, publishes with provenance, then creates the `v<version>` tag and a GitHub Release with that version's section of this file as the notes. It uses the `NPM_TOKEN` secret if there is one and npm trusted publishing (OIDC) if there is not. `scripts/release.mjs` holds the version comparison and the changelog extraction.
+- Releases are automatic. `publish.yml` no longer waits for a tag. When a push to `main` changes `package.json` to a version npm doesn't have, it runs the checks, publishes with provenance, then creates the `v<version>` tag and a GitHub Release using that version's section of this file as the notes. It uses the `NPM_TOKEN` secret if there is one, and npm trusted publishing (OIDC) if not. `scripts/release.mjs` holds the version comparison and the changelog extraction.
 
 ## [0.3.0] - 2026-11-02
 

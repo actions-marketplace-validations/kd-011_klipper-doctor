@@ -5,7 +5,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thanks for reporting. Please redact first: remove anything private from the log snippet (hostnames, usernames, serial numbers, IP addresses, Wi-Fi details). A short snippet is better than the whole log.
+        Remove anything private from the log snippet first (hostnames, usernames, serial numbers, IP addresses, Wi-Fi details). A short snippet beats the whole log.
   - type: input
     id: klipper
     attributes:

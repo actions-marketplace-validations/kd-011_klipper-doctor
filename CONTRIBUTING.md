@@ -8,9 +8,10 @@ A rule is a small object: an id, a severity, a title, a detail, a fix, a `docs` 
 
 1. Find the claim in the Klipper docs or source. No source, no rule. Copy any message string from the source rather than from memory, and put the file or page in a comment above the rule and in `docs`. Do not invent thresholds.
 2. Add the rule in `src/core/rules/crash/` (pick the file for the subsystem) or `src/core/rules/config/`, and list it in that folder's `index.ts`.
-3. Add a fixture in `scripts/make-fixtures.mjs` and run `npm run fixtures`. Fixtures are built from the message formats in the Klipper source. Never use a real person's log.
+3. Add a fixture in `scripts/make-fixtures.mjs` and run `npm run fixtures`. Fixtures are built from the message formats in the Klipper source. Never use a real person's log, even one that is public.
 4. Add the rule to the expectations in `test/crash.test.mjs` or `test/config.test.mjs`.
 5. Run `npm test` (it builds first), then `npm run check` and `npm run docs` to refresh the README rule table. `dist/` is committed, so commit the rebuilt files too.
+6. If the rule reads the config, run `npm run check-samples -- <path to a Klipper checkout>`. Every sample config has to come through with no error.
 
 ## Ground rules
 

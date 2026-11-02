@@ -40,11 +40,35 @@ const REMOVED: Removed[] = [
   { section: /^printer$/, option: 'max_stepper_error', removed: '2025-10-03', use: 'Delete the line.' },
   { section: /.*/, option: 'sensor_type', value: 'NTC 100K beta 3950', removed: '2024-02-15', use: 'Use "Generic 3950", or define your own [thermistor] with temperature1: 25, resistance1: 100000 and beta: 3950.' },
   { section: /.*/, option: 'sensor_type', value: 'rpi_temperature', removed: '2021-11-02', use: 'Use sensor_type: temperature_host.' },
+  { section: /^endstop_phase .+$/, option: 'endstop_phase', removed: '2020-12-18', use: 'Use trigger_phase, and run ENDSTOP_PHASE_CALIBRATE again.' },
+  { section: /^neopixel .+$/, option: 'color_order_grb', removed: '2020-10-29', use: 'Use color_order (RGB, GRB, RGBW or GRBW).' },
+  { section: /^servo .+$/, option: 'enable', removed: '2020-07-25', use: 'Delete the line. To disable a servo use SET_SERVO SERVO=name WIDTH=0.' },
+  { section: /^bed_mesh$/, option: 'min_point', removed: '2020-01-09', use: 'Use mesh_min.' },
+  { section: /^bed_mesh$/, option: 'max_point', removed: '2020-01-09', use: 'Use mesh_max.' },
+  { section: /^bed_mesh$/, option: 'bed_radius', removed: '2020-01-09', use: 'Use mesh_radius.' },
+  { section: /.*/, option: 'lcd_type', value: 'st7567', removed: '2019-12-18', use: 'Use lcd_type: uc1701, rename rs_pin to rst_pin, and add contrast: 60 if needed.' },
+  { section: /^extruder\d*$/, option: 'activate_gcode', removed: '2019-12-10', use: 'Use a [gcode_macro T0] style macro that calls ACTIVATE_EXTRUDER.' },
+  { section: /^extruder\d*$/, option: 'deactivate_gcode', removed: '2019-12-10', use: 'Use a [gcode_macro T0] style macro that calls ACTIVATE_EXTRUDER.' },
+  { section: /^extruder\d*$/, option: 'pressure_advance_lookahead_time', removed: '2019-11-21', use: 'Delete the line, and see the extruder options in Config_Reference.' },
+  // Config_Changes says [firmware_retract]; the section Klipper reads is [firmware_retraction].
+  { section: /^firmware_retract(ion)?$/, option: 'z_hop', removed: '2019-07-10', use: 'Delete the line.' },
+  { section: /^skew_correction$/, option: '', prefix: true, removed: '2019-06-28', use: 'Delete the option and set the skew with SET_SKEW (see Skew_Correction).' },
+  { section: /^(delta_calibrate|bed_tilt|bed_mesh|screws_tilt_adjust|z_tilt|quad_gantry_level)$/, option: 'samples', removed: '2019-06-06', use: 'Move it to the [probe] section.' },
+  { section: /^(delta_calibrate|bed_tilt|bed_mesh|screws_tilt_adjust|z_tilt|quad_gantry_level)$/, option: 'samples_result', removed: '2019-06-06', use: 'Move it to the [probe] section.' },
+  { section: /^(delta_calibrate|bed_tilt|bed_mesh|screws_tilt_adjust|z_tilt|quad_gantry_level)$/, option: 'sample_retract_dist', removed: '2019-06-06', use: 'Move it to the [probe] section.' },
+  { section: /^sx1509 .+$/, option: 'address', removed: '2019-04-04', use: 'Use i2c_address, as a decimal number (62, not 0x3E).' },
+  { section: /^tmc2660 .+$/, option: 'driver_vsense', removed: '2019-03-22', use: 'Delete the line. Klipper works it out from run_current.' },
+  { section: /^tmc(2130|2208) .+$/, option: 'driver_blank_time_select', removed: '2019-03-08', use: 'Use driver_TBL.' },
+  { section: /^bed_mesh$/, option: 'bed_shape', removed: '2019-02-24', use: 'Delete the line. A round bed sets mesh_radius and round_probe_count.' },
+  { section: /^bed_mesh$/, option: 'radius', removed: '2019-02-24', use: 'Use mesh_radius.' },
 ];
 
 // Release dates from the same page ("Klipper v0.12.0 released" entries). A version string such as
 // v0.12.0-250-gabc1234 is at least as new as its base tag, so the tag's date is a lower bound.
 const RELEASES: [string, string][] = [
+  ['v0.7.0', '2018-12-20'],
+  ['v0.8.0', '2019-10-21'],
+  ['v0.9.0', '2020-10-20'],
   ['v0.10.0', '2021-09-29'],
   ['v0.11.0', '2022-11-28'],
   ['v0.12.0', '2023-11-10'],

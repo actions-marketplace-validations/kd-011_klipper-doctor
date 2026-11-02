@@ -1,0 +1,4 @@
+# fixture: A log from another program quoting Klipper's messages part way along its lines
+# made by scripts/make-fixtures.mjs from message formats in the Klipper source (none, this is not a Klipper log). Not a real user's log.
+2026-11-01 10:00:00,000 [printer.py:state()] - mcu 'mcu': Unable to connect
+2026-11-01 10:00:01,000 [printer.py:state()] - Lost communication with MCU 'mcu'

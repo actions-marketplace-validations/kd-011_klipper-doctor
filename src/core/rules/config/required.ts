@@ -1,7 +1,7 @@
 import type { ParsedConfig } from '../../configParser.js';
 import type { Hit } from '../../types.js';
 import type { ConfigContext, ConfigRule } from '../types.js';
-import { KLIPPER_DOCS, KLIPPER_SRC } from '../types.js';
+import { configNumber, KLIPPER_DOCS, KLIPPER_SRC } from '../types.js';
 
 const CONFIG_REFERENCE = KLIPPER_DOCS + 'Config_Reference.html';
 
@@ -27,8 +27,18 @@ const isProbeEndstop = (cfg: ParsedConfig, sec: string) =>
 //                            options only once one of them is set, see extruderStepperOptions)
 //   heaters                  klippy/extras/heaters.py (min_temp, max_temp, control, heater_pin,
 //                            sensor_type, and pid_kp / pid_ki / pid_kd for control: pid)
-const STEPPER_BASE = ['step_pin', 'dir_pin', 'microsteps', 'rotation_distance'];
 const HEATER_BASE = ['heater_pin', 'sensor_type', 'control', 'min_temp', 'max_temp'];
+
+// klippy/stepper.py parse_step_distance: rotation_distance can be left out when gear_ratio is set, which
+// Klipper then reads as radians. Before 2021-11-02 (Config_Changes) step_distance replaced both
+// rotation_distance and microsteps. A log from such a version is valid, and removed-option covers it.
+function stepperBase(cfg: ParsedConfig, sec: string): string[] {
+  const out = ['step_pin', 'dir_pin'];
+  if (cfg.option(sec, 'step_distance')) return out;
+  out.push('microsteps');
+  if (!cfg.option(sec, 'gear_ratio')) out.push('rotation_distance');
+  return out;
+}
 
 function missing(cfg: ParsedConfig, sec: string, opts: string[]): string[] {
   return opts.filter((o) => !cfg.option(sec, o));
@@ -37,16 +47,18 @@ function missing(cfg: ParsedConfig, sec: string, opts: string[]): string[] {
 // klippy/kinematics/extruder.py PrinterExtruder: the stepper is only created when step_pin, dir_pin or
 // rotation_distance is present ("config.get('step_pin', None) is not None or ..."), because an
 // extruder can be driven by an [extruder_stepper] section instead. Once any of the three is set,
-// PrinterStepper needs all four STEPPER_BASE options.
+// PrinterStepper needs the stepperBase options.
 function extruderStepperOptions(cfg: ParsedConfig, sec: string): string[] {
   const started = ['step_pin', 'dir_pin', 'rotation_distance'].some((o) => cfg.option(sec, o));
-  return started ? STEPPER_BASE : [];
+  return started ? stepperBase(cfg, sec) : [];
 }
 
 function requiredFor(cfg: ParsedConfig, sec: string): string[] {
   const out: string[] = [];
   if (/^(extruder\d*|heater_bed|heater_generic .+)$/.test(sec)) {
     if (/^extruder\d*$/.test(sec)) out.push(...extruderStepperOptions(cfg, sec), 'nozzle_diameter', 'filament_diameter');
+    // Before 2024-02-15 (Config_Changes) shared_heater meant the heater options were in the other section.
+    if (cfg.option(sec, 'shared_heater')) return out;
     out.push(...HEATER_BASE);
     if (cfg.option(sec, 'control')?.value === 'pid') out.push('pid_kp', 'pid_ki', 'pid_kd');
   }
@@ -83,7 +95,7 @@ export const missingRequired: ConfigRule = {
     for (const sec of axisSections(cfg)) {
       // GenericPrinterRail reads position_max with no default (need_position_minmax is true for these
       // rails) even when the endstop is the probe; only position_endstop comes from the probe then.
-      const need = [...STEPPER_BASE, 'endstop_pin', 'position_max'];
+      const need = [...stepperBase(cfg, sec), 'endstop_pin', 'position_max'];
       if (!isProbeEndstop(cfg, sec)) need.push('position_endstop');
       push(sec, need);
     }
@@ -124,9 +136,9 @@ export const endstopRange: ConfigRule = {
       const mx = cfg.option(sec, 'position_max');
       if (!e || !mx) continue;
       const mnOpt = cfg.option(sec, 'position_min');
-      const endstop = Number(e.value);
-      const max = Number(mx.value);
-      const min = mnOpt ? Number(mnOpt.value) : 0;
+      const endstop = configNumber(e.value);
+      const max = configNumber(mx.value);
+      const min = mnOpt ? configNumber(mnOpt.value) : 0;
       if (![endstop, max, min].every(Number.isFinite) || !(max > min)) continue;
       const evidence = [e, mx, ...(mnOpt ? [mnOpt] : [])].map((o) => ({ line: o.line, text: lineText(o.line) }));
       if (endstop < min || endstop > max) {

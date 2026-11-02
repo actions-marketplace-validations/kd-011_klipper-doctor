@@ -43,6 +43,7 @@ export interface Hit {
     detail?: string;
     fix?: string;
     severity?: Severity;
+    docs?: string;
     evidence: Evidence[];
 }
 export interface RuleMeta {

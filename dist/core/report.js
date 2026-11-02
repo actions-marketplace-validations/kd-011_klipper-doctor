@@ -92,7 +92,7 @@ export function toText(report, opts = {}) {
         head.push(`Klipper ${m.klipperVersion}`);
     if (m.mcus.length)
         head.push(`MCU ${m.mcus.map((x) => (x.version ? `${x.name} ${x.version}` : x.name)).join(', ')}`);
-    if (m.inputKind === 'klippy.log')
+    if (m.sessions > 0)
         head.push(m.sessions > 1 ? `session ${m.analysedSession} of ${m.sessions}` : '1 session');
     head.push(`${m.linesRead} lines`);
     out.push(paint('bold', `klipper-doctor ${VERSION}`) + paint('dim', '  ' + head.join(' | ')), '');

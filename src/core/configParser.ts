@@ -2,9 +2,13 @@
 //  - RawConfigParser(strict=False, inline_comment_prefixes=(';', '#')): option names are
 //    lowercased, a repeated option keeps the LAST value, repeated sections merge.
 //  - ConfigFileReader._parse_config strips everything from the first "#" on every line, then
-//    handles "[include <glob>]" lines.
-//  - A line indented with whitespace continues the previous option (this is how gcode: blocks work).
+//    handles "[include <glob>]" lines. Only a line at column 0 can be an include, and the text after
+//    one is parsed separately, so it starts with no current section.
+//  - A line continues the previous option only when it is indented deeper than that option
+//    (RawConfigParser._read compares indent levels). Blank and comment lines do not change that.
+//    An indented line at the same level is a new option, and an indented [section] can start a section.
 //  - The SAVE_CONFIG block is every line after the AUTOSAVE_HEADER, each prefixed "#*# ".
+// This was checked by running both parsers over every file in Klipper's config/ directory.
 
 export const AUTOSAVE_MARKER = '#*# <---------------------- SAVE_CONFIG ---------------------->';
 
@@ -56,9 +60,11 @@ export interface ParsedConfig {
   sectionNames(re: RegExp): string[];
 }
 
-const OPTION_RE = /^(.*?)\s*([:=])\s*(.*)$/;
 const SECTION_RE = /^\[([^\]]+)\]/;
-const LOOKS_LIKE_KEY = /^[A-Za-z_][A-Za-z0-9_.\-]*$/;
+// configparser takes any text before the first ":" or "=" as an option name, and Klipper then rejects
+// a name it does not read. These characters only appear in a name when a line of G-code or a template
+// has lost its indent. gcode_macro reads any name that starts with variable_ (extras/gcode_macro.py).
+const NOT_A_KEY = /[\s{}%()'"[\]<>]/;
 const GCODE_OPTION = /(^|_)gcode$|^script$/i;
 
 /**
@@ -75,6 +81,7 @@ export function parseConfig(lines: string[], firstLine: number, raw: boolean): P
   let cursect: CfgSection | undefined;
   let curopt: CfgOption | undefined;
   let inSave = false;
+  let indentLevel = 0;
 
   for (let i = 0; i < lines.length; i++) {
     const no = firstLine + i;
@@ -85,6 +92,7 @@ export function parseConfig(lines: string[], firstLine: number, raw: boolean): P
       saveConfigLine = no;
       cursect = undefined;
       curopt = undefined;
+      indentLevel = 0;
       continue;
     }
     if (inSave) {
@@ -94,34 +102,31 @@ export function parseConfig(lines: string[], firstLine: number, raw: boolean): P
       else continue;
       // Second line of Klipper's AUTOSAVE_HEADER.
       if (line.startsWith('DO NOT EDIT THIS BLOCK OR BELOW.')) continue;
-    } else if (raw) {
+    }
+    if (raw) {
       const hash = line.indexOf('#');
       if (hash >= 0) line = line.slice(0, hash);
     }
 
-    // Full-line and inline ";" comments (inline needs whitespace before it).
-    const trimmedStart = line.trimStart();
-    if (trimmedStart.startsWith(';')) continue;
-    const semi = line.search(/\s;/);
-    if (semi >= 0) line = line.slice(0, semi);
+    const text = stripSemicolonComment(line).trim();
+    if (text === '') continue;
 
-    if (line.trim() === '') continue;
-
-    if (/^\s/.test(line)) {
-      if (curopt) {
-        curopt.value += '\n' + line.trim();
-        curopt.continuation.push(no);
-      }
+    const indent = line.search(/\S/);
+    if (cursect && curopt && indent > indentLevel) {
+      curopt.value += '\n' + text;
+      curopt.continuation.push(no);
       continue;
     }
+    indentLevel = indent;
 
-    const sm = SECTION_RE.exec(line);
+    const sm = SECTION_RE.exec(text);
     if (sm) {
-      const header = (sm[1] as string).trim();
-      if (header.startsWith('include ')) {
+      const header = sm[1] as string;
+      if (indent === 0 && !inSave && header.startsWith('include ')) {
         includes.push({ spec: header.slice(8).trim(), line: no });
         cursect = undefined;
         curopt = undefined;
+        indentLevel = 0;
         continue;
       }
       cursect = { name: header, line: no, options: [], saveConfig: inSave };
@@ -130,25 +135,25 @@ export function parseConfig(lines: string[], firstLine: number, raw: boolean): P
       continue;
     }
 
-    const om = OPTION_RE.exec(line);
-    const key = om ? (om[1] as string).trim() : '';
-    if (om && key !== '' && cursect) {
-      if (raw && !LOOKS_LIKE_KEY.test(key)) {
-        problems.push(problem(no, lines[i] as string, cursect, curopt));
-      } else {
-        curopt = {
-          name: key.toLowerCase(),
-          rawName: key,
-          value: (om[3] as string).trim(),
-          line: no,
-          continuation: [],
-          saveConfig: inSave,
-        };
-        cursect.options.push(curopt);
-      }
-    } else if (raw) {
-      problems.push(problem(no, lines[i] as string, cursect, curopt));
+    const at = delimiterAt(text);
+    const key = at > 0 ? text.slice(0, at).trimEnd() : '';
+    if (key === '' || !cursect) {
+      if (raw) problems.push(problem(no, lines[i] as string, cursect, curopt));
+      continue;
     }
+    if (raw && NOT_A_KEY.test(key) && !key.toLowerCase().startsWith('variable_')) {
+      problems.push(problem(no, lines[i] as string, cursect, curopt));
+      continue;
+    }
+    curopt = {
+      name: key.toLowerCase(),
+      rawName: key,
+      value: text.slice(at + 1).trim(),
+      line: no,
+      continuation: [],
+      saveConfig: inSave,
+    };
+    cursect.options.push(curopt);
   }
 
   const byName = new Map<string, CfgSection[]>();
@@ -181,10 +186,26 @@ export function parseConfig(lines: string[], firstLine: number, raw: boolean): P
     },
     sectionNames(re) {
       const out: string[] = [];
-      for (const s of sections) if (re.test(s.name) && !out.includes(s.name)) out.push(s.name);
+      for (const name of byName.keys()) if (re.test(name)) out.push(name);
       return out;
     },
   };
+}
+
+/** A ";" starts a comment at the start of a line or after whitespace (RawConfigParser._read). */
+function stripSemicolonComment(line: string): string {
+  if (line.trimStart().startsWith(';')) return '';
+  for (let at = line.indexOf(';'); at >= 0; at = line.indexOf(';', at + 1)) {
+    if (at === 0 || /\s/.test(line.charAt(at - 1))) return line.slice(0, at);
+  }
+  return line;
+}
+
+function delimiterAt(text: string): number {
+  const colon = text.indexOf(':');
+  const equals = text.indexOf('=');
+  if (colon < 0) return equals;
+  return equals < 0 ? colon : Math.min(colon, equals);
 }
 
 function problem(line: number, text: string, sec?: CfgSection, opt?: CfgOption): CfgProblem {

@@ -2,6 +2,7 @@ import type { ConfigRule } from '../types.js';
 import { deprecatedOption, removedOption } from './removed.js';
 import { endstopRange, missingRequired, safeZHomeConflict } from './required.js';
 import {
+  configFragment,
   duplicateOption,
   duplicateSection,
   gcodeUnindented,
@@ -25,4 +26,5 @@ export const configRules: ConfigRule[] = [
   tmcStealthchopThreshold,
   noInputShaper,
   includesNotRead,
+  configFragment,
 ];

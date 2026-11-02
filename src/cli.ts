@@ -62,7 +62,10 @@ function main(argv: string[]): number {
   try {
     text = readFileSync(file === '-' ? 0 : file, 'utf8');
   } catch (e) {
-    fail(e instanceof Error ? e.message : String(e));
+    const message = e instanceof Error ? e.message : String(e);
+    // Common under WSL and over ssh: a path copied from Windows Explorer.
+    const windows = process.platform !== 'win32' && /^(?:[A-Za-z]:[\\/]|\\\\)/.test(file);
+    fail(windows ? `${message}\nThat looks like a Windows path. Under WSL the C: drive is /mnt/c, and a host reached over ssh has its own paths.` : message);
   }
 
   const report: Report = analyze(text, { filename: file === '-' ? undefined : file });
@@ -74,5 +77,11 @@ function main(argv: string[]): number {
 
   return [...report.crash, ...report.config].some((f) => f.severity === 'error') ? 1 : 0;
 }
+
+// "klipper-doctor x | head" closes the pipe early, which is not an error worth reporting.
+process.stdout.on('error', (e: NodeJS.ErrnoException) => {
+  if (e.code !== 'EPIPE') throw e;
+  process.exit(process.exitCode ?? 0);
+});
 
 process.exitCode = main(process.argv.slice(2));

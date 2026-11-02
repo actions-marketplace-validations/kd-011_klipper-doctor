@@ -1,6 +1,6 @@
 import { deprecatedOption, removedOption } from './removed.js';
 import { endstopRange, missingRequired, safeZHomeConflict } from './required.js';
-import { duplicateOption, duplicateSection, gcodeUnindented, includesNotRead, saveConfigDuplicate, unparseableLine, } from './structure.js';
+import { configFragment, duplicateOption, duplicateSection, gcodeUnindented, includesNotRead, saveConfigDuplicate, unparseableLine, } from './structure.js';
 import { noInputShaper, tmcStealthchopThreshold } from './tuning.js';
 export const configRules = [
     unparseableLine,
@@ -16,4 +16,5 @@ export const configRules = [
     tmcStealthchopThreshold,
     noInputShaper,
     includesNotRead,
+    configFragment,
 ];

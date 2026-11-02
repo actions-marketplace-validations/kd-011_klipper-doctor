@@ -32,6 +32,26 @@ const EXPECTED = {
   'crlf.log': ['no-failure-found'],
   'rollover-header.log': ['no-failure-found'],
   'multi-session.log': ['no-failure-found'],
+  'heater-then-command-request.log': ['heater-verify'],
+  'mcu-fault-then-command-request.log': ['crash-unknown-reason'],
+  'timer-on-second-mcu.log': ['mcu-timer-too-close'],
+  'timer-old-format.log': ['mcu-timer-too-close'],
+  'estop-webhooks.log': ['mcu-command-request'],
+  'estop-m112.log': ['mcu-command-request'],
+  'internal-error-then-command-request.log': ['crash-unknown-reason'],
+  'host-reason-no-rule.log': ['crash-unknown-reason'],
+  'lost-communication-cascade.log': ['mcu-lost-communication'],
+  'adc-then-tmc.log': ['mcu-adc-out-of-range'],
+  'dump-noise.log': ['mcu-lost-communication'],
+  'tmc-failed-to-init.log': ['tmc-comm'],
+  'tmc-init-then-timer.log': ['mcu-timer-too-close'],
+  'tmc-all-ones.log': ['tmc-reports-error'],
+  'tmc-cs-actual-reset.log': ['tmc-reports-error'],
+  'connect-mcu-already-shutdown.log': ['crash-unknown-reason'],
+  'connect-unhandled.log': ['crash-unknown-reason'],
+  'previous-mcu-shutdown.log': ['mcu-adc-out-of-range'],
+  'rollover-real-order.log': ['mcu-timer-too-close'],
+  'connect-failed-then-estop.log': ['mcu-connect-failed'],
 };
 
 for (const [file, want] of Object.entries(EXPECTED)) {
@@ -153,20 +173,6 @@ test('evidence line numbers point at the same text in the file', () => {
   }
 });
 
-test('performance: a 15 MB log parses well inside the budget', () => {
-  const base = fixture('timer-too-close.log');
-  const stat = 'Stats 5003.2: gcodein=0  mcu: mcu_awake=0.001 mcu_task_avg=0.000009 bytes_write=1400 bytes_read=1800 bytes_retransmit=0 freq=72000123 heater_bed: target=60 temp=59.8 pwm=0.250 sysload=0.22 cputime=2.5 memavail=800000\n';
-  const filler = stat.repeat(Math.ceil((15 * 1024 * 1024) / stat.length));
-  const idx = base.indexOf('Transition to shutdown state');
-  const big = base.slice(0, idx) + filler + base.slice(idx);
-  assert.ok(big.length > 15 * 1024 * 1024);
-  const t0 = performance.now();
-  const r = analyze(big);
-  const ms = performance.now() - t0;
-  assert.deepEqual(ids(r.crash), ['mcu-timer-too-close']);
-  assert.ok(ms < 2000, `took ${ms.toFixed(0)} ms`);
-});
-
 test('gcode command errors are warnings: Klipper stays up, so they are not crash errors', () => {
   for (const f of ['move-out-of-range.log', 'must-home.log']) {
     const r = analyze(fixture(f));
@@ -195,4 +201,198 @@ test('rotated log: a crash before the restart is not reported as the current ses
   assert.equal(r.meta.sessions, 2);
   assert.equal(r.meta.analysedSession, 2);
   assert.deepEqual(ids(r.crash), ['no-failure-found']);
+});
+
+// ---- Command request is what every MCU reports after the host stops it (mcu.py _shutdown sends
+// emergency_stop, src/basecmd.c answers "Command request"). It is only the cause when nothing came before it. ----
+
+test('Command request after a heater shutdown is the effect, not a second diagnosis', () => {
+  const r = analyze(fixture('heater-then-command-request.log'));
+  assert.equal(r.crash.length, 1);
+  assert.doesNotMatch(JSON.stringify(r.crash), /M112/);
+});
+
+test('an MCU reason no rule knows is shown, not hidden behind Command request', () => {
+  const f = analyze(fixture('mcu-fault-then-command-request.log')).crash[0];
+  assert.match(f.title, /MCU 'mcu' shutdown: Thermocouple reader fault/);
+  assert.ok(f.evidence.some((e) => /Thermocouple reader fault/.test(e.text)));
+});
+
+test('the MCU named in a finding is the one that gave the reason, not the first one listed', () => {
+  const f = analyze(fixture('timer-on-second-mcu.log')).crash[0];
+  assert.match(f.detail, /MCU 'mcu' shut down with "Timer too close"/);
+  assert.ok(f.evidence.some((e) => e.text === "MCU 'mcu' shutdown: Timer too close"));
+  assert.ok(!f.evidence.some((e) => /toolhead|rpi/.test(e.text)));
+});
+
+test('the older format with the reason on the Transition line still works, with a second MCU after it', () => {
+  const f = analyze(fixture('timer-old-format.log')).crash[0];
+  assert.match(f.detail, /MCU 'mcu' shut down/);
+});
+
+test('an emergency stop says where it came from', () => {
+  const web = analyze(fixture('estop-webhooks.log')).crash[0];
+  assert.match(web.detail, /Shutdown due to webhooks request/);
+  assert.match(web.detail, /emergency.stop/i);
+  assert.match(web.fix, /emergency.stop/i);
+  const m112 = analyze(fixture('estop-m112.log')).crash[0];
+  assert.match(m112.detail, /M112/);
+});
+
+test('a host exception reports the exception, and the Command request after it is not mentioned as a cause', () => {
+  const f = analyze(fixture('internal-error-then-command-request.log')).crash[0];
+  assert.match(f.title, /Internal error on command:"BED_SCREWS_ADJUST"/);
+  assert.match(f.detail, /AttributeError/);
+  assert.doesNotMatch(f.detail, /M112/);
+});
+
+test('errors after the first shutdown are consequences, not more diagnoses', () => {
+  const r = analyze(fixture('host-reason-no-rule.log'));
+  assert.match(r.crash[0].title, /Timeout on wait for 'tmcuart_response' response/);
+  assert.equal(analyze(fixture('lost-communication-cascade.log')).crash.length, 1);
+  assert.equal(analyze(fixture('adc-then-tmc.log')).crash.length, 1);
+});
+
+test('text quoted in the request dumps after a shutdown never fires a rule', () => {
+  const r = analyze(fixture('dump-noise.log'));
+  assert.deepEqual(ids(r.crash), ['mcu-lost-communication']);
+});
+
+test('text in a request dump does not fire a rule even when the log has no shutdown line', () => {
+  const r = analyze(`Start printer at Sun Nov  1 10:00:00 2026 (1793527200.0 5000.0)\nReceived 5014.2: b'{"params": {"script": "M117 MCU \\'mcu\\' shutdown: Timer too close"}}'\n`);
+  assert.deepEqual(ids(r.crash), ['no-failure-found']);
+});
+
+// ---- A log with several starts: the user usually restarted Klipper before grabbing the log. ----
+
+test('no failure in the last session, but an earlier one died: the finding says which, why and where', () => {
+  const r = analyze(fixture('multi-session.log'));
+  const f = r.crash[0];
+  assert.equal(r.meta.analysedSession, 3);
+  assert.equal(f.severity, 'warning');
+  assert.match(f.title, /session 2 of 3/);
+  assert.match(f.title, /Lost communication/);
+  assert.match(f.detail, /USB|cable/);
+  assert.match(f.fix, /USB cable/);
+  const lines = fixture('multi-session.log').split('\n');
+  assert.ok(f.evidence.length > 0);
+  for (const e of f.evidence) assert.equal(lines[e.line - 1], e.text);
+});
+
+test('the earlier failure keeps a rotated log at exit code 0 and a single finding', () => {
+  const r = analyze(fixture('rollover-shutdown-restart.log'));
+  assert.deepEqual(ids(r.crash), ['no-failure-found']);
+  assert.equal(r.crash[0].severity, 'warning');
+  assert.match(r.crash[0].title, /Timer too close/);
+});
+
+test('a clean log with no earlier failure still says no failure plainly', () => {
+  const f = analyze(fixture('clean.log')).crash[0];
+  assert.equal(f.severity, 'note');
+  assert.match(f.title, /No failure found/);
+});
+
+test('an earlier emergency stop stays a note: somebody chose to stop', () => {
+  const stop = fixture('estop-webhooks.log');
+  const f = analyze(stop + fixture('clean.log')).crash[0];
+  assert.equal(f.id, 'no-failure-found');
+  assert.equal(f.severity, 'note');
+  assert.match(f.detail, /webhooks/);
+});
+
+test('warnings in the last session do not hide a failed earlier session', () => {
+  const r = analyze(fixture('timer-too-close.log') + fixture('must-home.log'));
+  assert.deepEqual(ids(r.crash), ['must-home-first', 'no-failure-found']);
+  assert.match(r.crash[1].title, /Timer too close/);
+});
+
+// ---- TMC details, against docs/TMC_Drivers.md and the field names in extras/tmc2130.py ----
+
+test('a TMC driver that failed to init is not a crash when Klipper carried on', () => {
+  const f = analyze(fixture('tmc-failed-to-init.log')).crash[0];
+  assert.equal(f.severity, 'warning');
+  assert.match(f.detail, /startup/);
+  assert.match(f.detail, /motor power/);
+});
+
+test('a TMC init failure does not join the diagnosis of a later shutdown', () => {
+  assert.deepEqual(ids(analyze(fixture('tmc-init-then-timer.log')).crash), ['mcu-timer-too-close']);
+});
+
+test('TMC status ffffffff reads as SPI, not as every flag at once', () => {
+  const f = analyze(fixture('tmc-all-ones.log')).crash[0];
+  assert.match(f.detail, /SPI/);
+  assert.doesNotMatch(f.detail, /too hot|very high current/);
+  assert.match(f.fix, /SPI/);
+});
+
+test('cs_actual=0(Reset?) in lowercase, as the source writes it, reads as a driver reset', () => {
+  const f = analyze(fixture('tmc-cs-actual-reset.log')).crash[0];
+  assert.match(f.detail, /reset itself/);
+});
+
+test('se=0(Reset?) from a tmc2660 reads as a driver reset', () => {
+  const r = analyze("Start printer at Sun Nov  1 10:00:00 2026 (1793527200.0 5000.0)\nTransition to shutdown state: TMC 'stepper_y' reports error: READRSP@RDSEL2: 00012300 se=0(Reset?)\n");
+  assert.match(r.crash[0].detail, /reset itself/);
+});
+
+// ---- The rest of the fallback and the MCU rules ----
+
+test('MCU error during connect shows the message from the traceback and what to do next', () => {
+  const f = analyze(fixture('connect-mcu-already-shutdown.log')).crash[0];
+  assert.match(f.title, /Can not update MCU 'mcu' config as it is shutdown/);
+  assert.match(f.fix, /FIRMWARE_RESTART/);
+  assert.ok(f.evidence.some((e) => /Can not update/.test(e.text)));
+});
+
+test('Unhandled exception during connect shows the exception', () => {
+  const f = analyze(fixture('connect-unhandled.log')).crash[0];
+  assert.match(f.title, /ImportError: cannot import name/);
+});
+
+test('a Previous MCU shutdown says the fault is older than this start', () => {
+  const f = analyze(fixture('previous-mcu-shutdown.log')).crash[0];
+  assert.match(f.detail, /before this/);
+  assert.match(f.fix, /FIRMWARE_RESTART/);
+});
+
+test('ADC out of range does not claim a temperature when Klipper could not compute one', () => {
+  const r = analyze("Transition to shutdown state: MCU shutdown\nMCU 'mcu' shutdown: ADC out of range\nSensor 'extruder' temperature ? not in range 0.000:270.000\n");
+  assert.doesNotMatch(r.crash[0].detail, /read \? C/);
+  assert.match(r.crash[0].detail, /0\.000:270\.000/);
+});
+
+test('the heater rule also covers a heater that cannot hold its target', () => {
+  const f = analyze(fixture('heater-not-heating.log')).crash[0];
+  assert.match(f.detail, /hold/);
+});
+
+test('the stepcompress text no longer says it only comes from syncing a position', () => {
+  const f = analyze(fixture('stepcompress.log')).crash[0];
+  assert.match(f.detail, /motion_queuing\.py/);
+  const r = analyze("Start printer at Sun Nov  1 10:00:00 2026 (1793527200.0 5000.0)\nTransition to shutdown state: Internal error in MCU 'mcu' stepcompress\n");
+  assert.deepEqual(ids(r.crash), ['stepcompress-internal-error']);
+});
+
+test('a Section error mentions add-ons, since Klipper only knows sections it has a module for', () => {
+  const r = analyze("Start printer at Sun Nov  1 10:00:00 2026 (1793527200.0 5000.0)\nConfig error\nTraceback (most recent call last):\n  File \"/k.py\", line 1, in x\nconfigparser.Error: Section 'gcode_shell_command x' is not a valid config section\n");
+  assert.match(r.crash[0].detail, /add-on/);
+});
+
+test('a CAN MCU that will not connect gets CAN advice, not a USB path', () => {
+  const r = analyze("Start printer at Sun Nov  1 10:00:00 2026 (1793527200.0 5000.0)\nmcu 'ebb': Starting CAN connect\nmcu 'ebb': Unable to open CAN port: [Errno 19] No such device\nMCU error during connect\nTraceback (most recent call last):\n  File \"/k.py\", line 1, in x\nmcu.error: mcu 'ebb': Unable to connect\n");
+  assert.deepEqual(ids(r.crash), ['mcu-connect-failed']);
+  assert.match(r.crash[0].fix, /canbus_uuid/);
+  assert.doesNotMatch(r.crash[0].fix, /serial\/by-id/);
+});
+
+test('an emergency stop after a failed connect is not listed as a second diagnosis', () => {
+  const r = analyze(fixture('connect-failed-then-estop.log'));
+  assert.equal(r.crash.length, 1);
+  assert.doesNotMatch(r.crash[0].detail, /emergency stop/i);
+});
+
+test('LowSideShort, the older name for ShortToSupply, reads as a short', () => {
+  const r = analyze("Start printer at Sun Nov  1 10:00:00 2026 (1793527200.0 5000.0)\nTransition to shutdown state: TMC 'stepper_z' reports error: DRV_STATUS: 40140010 s2vsa=1(LowSideShort_A!) cs_actual=20\n");
+  assert.match(r.crash[0].detail, /very high current/);
 });

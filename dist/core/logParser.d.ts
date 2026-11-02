@@ -14,9 +14,11 @@ export interface LogSession {
     monotonicStart?: number;
     klipperVersion?: string;
     mcus: McuInfo[];
+    /** cutOff: the dump has no end marker, so part of the config is missing. */
     config?: {
         startLine: number;
         lines: string[];
+        cutOff?: boolean;
     };
     statsCount: number;
     firstStats?: StatsPoint;
@@ -31,7 +33,13 @@ export interface ParsedLog {
     /** Number of Klipper starts found (at least 1 when there is any text). */
     startCount: number;
 }
+/**
+ * Line ends as they turn up in logs that have been through other systems: LF, CR LF, a lone CR and
+ * the CR CR LF of a double conversion. A log file is mostly LF, so that path stays a plain split.
+ */
 export declare function splitLines(text: string): string[];
+/** Removes the fork's prefix, in place, so the rest of the engine sees the lines Klipper's source writes. */
+export declare function stripForkPrefix(lines: string[]): void;
 export declare function looksLikeLog(lines: string[]): boolean;
 export declare function parseLog(lines: string[]): ParsedLog;
 /** Whole seconds the session ran, from the Stats lines, or undefined. */

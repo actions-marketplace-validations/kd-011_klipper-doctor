@@ -28,8 +28,9 @@ const MESSAGES: { re: RegExp; explain: (m: RegExpExecArray) => { detail: string;
   {
     re: /Section '([^']+)' is not a valid config section/,
     explain: (m) => ({
-      detail: `The config has a [${m[1]}] section that Klipper does not recognise. It is usually a misspelt section name.`,
-      fix: `Check the spelling of [${m[1]}] against the Config Reference.`,
+      // klippy/klippy.py load_object: a section only counts if klippy/extras/ has a module of that name.
+      detail: `The config has a [${m[1]}] section that Klipper does not recognise. It is usually a misspelt section name, or a section from an add-on that is not installed in klippy/extras.`,
+      fix: `Check the spelling of [${m[1]}] against the Config Reference, or install the add-on it belongs to.`,
     }),
   },
   {

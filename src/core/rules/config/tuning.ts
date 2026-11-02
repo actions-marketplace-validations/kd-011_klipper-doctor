@@ -1,6 +1,6 @@
 import type { Hit } from '../../types.js';
 import type { ConfigRule } from '../types.js';
-import { KLIPPER_DOCS } from '../types.js';
+import { configNumber, KLIPPER_DOCS } from '../types.js';
 
 // docs/TMC_Drivers.md, "Setting spreadCycle vs stealthChop Mode": "It is recommended to always use
 // spreadCycle mode (by not specifying stealthchop_threshold) or to always use stealthChop mode (by
@@ -21,7 +21,7 @@ export const tmcStealthchopThreshold: ConfigRule = {
     for (const name of cfg.sectionNames(/^tmc\d+ /)) {
       const o = cfg.option(name, 'stealthchop_threshold');
       if (!o) continue;
-      const v = Number(o.value);
+      const v = configNumber(o.value);
       if (!Number.isFinite(v) || v === 0 || v === 999999) continue;
       hits.push({
         title: `[${name}] has stealthchop_threshold ${o.value}`,

@@ -17,34 +17,55 @@ export const noFailureMeta = {
     fix: 'If the print still failed, check that this is the right session and the right log file.',
     docs: KLIPPER_DOCS + 'FAQ.html',
 };
+// logging.exception() text in klippy/klippy.py _connect and run, klippy/gcode.py _process_commands and
+// extras/motion_queuing.py. Each is followed by a Python traceback.
+const FAILURE_LINE = /^(Config error|Protocol error|MCU error during connect|Unhandled exception|Internal error|Repeat unhandled exception|Exception in flush_handler)/;
 /** Lines that mean the session failed even when no specific rule recognised the message. */
-const FAILURE_LINE = /^(Config error|Protocol error|MCU error during connect|Unhandled exception|Internal error|Repeat unhandled exception)/;
 export function failureEvidence(ctx) {
     const out = [...ctx.session.shutdowns];
     for (const e of ctx.notable)
         if (FAILURE_LINE.test(e.text))
             out.push(e);
+    if (ctx.cause)
+        out.push(ctx.cause.ev);
     return out.sort((a, b) => a.line - b.line);
+}
+/** The exception on the last line of the traceback after `line`, which is where Python puts the message. */
+function exceptionAfter(ctx, line) {
+    const after = ctx.after(line, 120);
+    if (!after[0]?.text.startsWith('Traceback (most recent call last):'))
+        return undefined;
+    return after.slice(1).find((e) => !/^\s/.test(e.text));
 }
 export function unknownReason(ctx) {
     const fails = failureEvidence(ctx);
     const first = fails[0];
     if (!first)
         return null;
+    const c = ctx.cause;
     const reasonText = first.text.replace(/^Transition to shutdown state: /, '');
-    // The MCU names its reason on a follow-up line: "MCU 'mcu' shutdown: <reason>".
-    const mcu = ctx.match(/\bMCU '([^']+)' shutdown: (.+)$/);
-    const reason = mcu ? `MCU '${mcu.m[1]}' shutdown: ${mcu.m[2]}` : reasonText;
-    const lines = [first, ...(mcu ? [mcu.ev] : []), ...ctx.after(first.line, 3)];
+    const exception = exceptionAfter(ctx, first.line);
+    // "mcu.error: text" says nothing the text does not, but "ImportError: text" does.
+    const raised = exception?.text.replace(/^(?:\w+\.)*(?:error|Error): /, '');
+    const reason = c?.mcu
+        ? `${c.previous ? 'Previous ' : ''}MCU '${c.mcu}' shutdown: ${c.reason}`
+        : raised
+            ? `${reasonText}: ${raised}`
+            : reasonText;
+    const lines = [first, ...(c ? [c.ev] : []), ...(exception ? [exception] : []), ...ctx.after(first.line, 3)];
     const seen = new Set();
     const evidence = lines.filter((e) => (seen.has(e.line) ? false : (seen.add(e.line), true))).slice(0, 5);
-    return {
+    const hit = {
         title: `Klipper stopped: ${reason}`,
         detail: `Klipper logged "${reason}" and no klipper-doctor rule recognises it. The lines below it in the log usually carry the detail.`,
         evidence,
     };
+    // extras/error_mcu.py message_mcu_connect_error
+    if (first.text.startsWith('MCU error during connect'))
+        hit.fix = 'Fix what the message names, then run FIRMWARE_RESTART, as Klipper asks after an MCU error at connect.';
+    return hit;
 }
-export function noFailure(ctx) {
+export function noFailure(ctx, earlier, recognised) {
     const s = ctx.session;
     const who = s.klipperVersion ? `Klipper ${s.klipperVersion}` : 'Klipper (version not in this log)';
     const up = sessionUptime(s);
@@ -55,6 +76,26 @@ export function noFailure(ctx) {
         ran = `wrote ${s.statsCount} Stats lines`;
     else
         ran = 'wrote no Stats lines';
+    if (earlier) {
+        const f = earlier.finding;
+        return {
+            // Somebody choosing to stop the printer is worth saying, but it is not a fault to chase.
+            severity: f.id === 'mcu-command-request' ? 'note' : 'warning',
+            title: `No failure in the last session, but session ${earlier.index} of ${ctx.sessionCount} failed: ${f.title}`,
+            detail: `In the last session ${who} ${ran} and logged no failure. Klipper was restarted after an earlier session failed, and that session is probably the one you are after. It may already be fixed. Session ${earlier.index}: ${f.detail}`,
+            fix: f.fix,
+            docs: f.docs,
+            evidence: f.evidence,
+        };
+    }
+    if (!recognised) {
+        return {
+            title: 'No failure found in this file',
+            detail: 'This file has none of the lines Klipper writes, so it may not be a klippy.log. Moonraker and KlipperScreen keep their own logs, and klipper-doctor reads only klippy.log.',
+            fix: 'Look for klippy.log, usually in printer_data/logs.',
+            evidence: [],
+        };
+    }
     const many = ctx.sessionCount > 1 ? ` This is session ${s.index} of ${ctx.sessionCount}, the last one in the file.` : '';
     return {
         title: 'No failure found in the last session',

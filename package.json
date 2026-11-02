@@ -38,6 +38,8 @@
     "docs": "node scripts/gen-rules-table.mjs",
     "assets": "node scripts/render-assets.mjs",
     "fixtures": "node scripts/make-fixtures.mjs",
+    "bench": "node scripts/bench.mjs",
+    "check-samples": "node scripts/check-samples.mjs",
     "pretest": "npm run build",
     "test": "node --test test/*.test.mjs",
     "version": "node scripts/sync-version.mjs && npm run build && git add src/core/version.ts dist",

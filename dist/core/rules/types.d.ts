@@ -12,9 +12,19 @@ export interface ConfigContext {
 export interface ConfigRule extends RuleMeta {
     /** 'raw' rules need the original file: the log dump has comments stripped and repeats already merged. */
     scope: 'raw' | 'any';
-    /** Skipped when an [include] is present, because the rest of the config may be in another file. */
+    /** Skipped when part of the config is not in the input: an [include], a file with no [printer], a dump cut off. */
     needsComplete?: boolean;
     check(ctx: ConfigContext): Hit[];
+}
+/** What stopped the session, as Klipper reported it. */
+export interface Cause {
+    /** One line, without the "Transition to shutdown state:" or "MCU 'x' shutdown:" prefix. */
+    reason: string;
+    /** The MCU that gave the reason. Unset when the host gave it. */
+    mcu?: string;
+    /** The MCU was already shut down when this Klipper start connected (extras/error_mcu.py). */
+    previous: boolean;
+    ev: Evidence;
 }
 export interface CrashContext {
     session: LogSession;
@@ -23,10 +33,11 @@ export interface CrashContext {
     config?: ParsedConfig;
     /** Non-Stats lines of the session, with their line numbers. */
     notable: Evidence[];
-    /** Lines of the session after the first match of `re`, for context. */
+    cause?: Cause;
+    /** The first causal line matching `re`: see causalLines in core/cause.ts. */
     find(re: RegExp): Evidence | undefined;
     findAll(re: RegExp, limit?: number): Evidence[];
-    /** The first line matching `re`, with its regex match. */
+    /** The first causal line matching `re`, with its regex match. */
     match(re: RegExp): {
         m: RegExpExecArray;
         ev: Evidence;
@@ -39,5 +50,7 @@ export interface CrashContext {
 export interface CrashRule extends RuleMeta {
     check(ctx: CrashContext): Hit | null;
 }
+/** Python's float() accepts neither a blank nor hex, unlike Number(). NaN when Klipper would not read it. */
+export declare function configNumber(value: string | undefined): number;
 export declare const KLIPPER_DOCS = "https://www.klipper3d.org/";
 export declare const KLIPPER_SRC = "https://github.com/Klipper3d/klipper/blob/master/";

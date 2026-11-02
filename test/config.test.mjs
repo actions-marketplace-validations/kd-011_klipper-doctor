@@ -262,3 +262,156 @@ test('missing-required: position_max is still required when the z endstop is the
   assert.match(f.title, /\[stepper_z\].*position_max/);
   assert.doesNotMatch(f.title, /position_endstop/);
 });
+
+// ---- The parser against Python's configparser, which is what Klipper uses. Each expected value was
+// checked by running RawConfigParser(strict=False, inline_comment_prefixes=(';', '#')) on the input. ----
+
+const parsesCleanly = (text) =>
+  analyze(`[printer]\nkinematics: none\nmax_velocity: 1\nmax_accel: 1\n[input_shaper]\n${text}`).config.length === 0;
+
+test('indented options are options: equal indents do not continue the previous line', () => {
+  const r = analyze(fixture('indented.cfg'), { filename: 'printer.cfg' });
+  assert.deepEqual(r.config.filter((f) => f.severity !== 'note'), []);
+});
+
+test('an indented option after a section header is read, so its absence is not reported', () => {
+  const r = analyze('[printer]\n  kinematics: none\n  max_velocity: 1\n  max_accel: 1\n[input_shaper]\n');
+  assert.deepEqual(r.config, []);
+});
+
+test('a line indented deeper than its option is still a continuation', () => {
+  const r = analyze('[printer]\nkinematics: none\nmax_velocity: 1\nmax_accel: 1\n[input_shaper]\n[gcode_macro A]\ngcode:\n  G28\n  G1 X1\n      G1 X2\ndescription: x\n');
+  assert.deepEqual(r.config, []);
+});
+
+test('a section header indented at the option level starts a section', () => {
+  const r = analyze('  [printer]\n  kinematics: none\n  max_velocity: 1\n  max_accel: 1\n  [input_shaper]\n');
+  assert.deepEqual(r.config, []);
+});
+
+test('a [section] indented deeper than its option is continuation text, as in configparser', () => {
+  const r = analyze('[printer]\nkinematics: none\n  [input_shaper]\nmax_velocity: 1\nmax_accel: 1\n');
+  assert.deepEqual(ids(r.config), ['no-input-shaper']);
+});
+
+test('an option after an [include] with no new section is an error, because Klipper reads the part after an include separately', () => {
+  const r = analyze('[printer]\nkinematics: none\n[include a.cfg]\nmax_velocity: 1\n');
+  assert.ok(ids(r.config).includes('unparseable-line'));
+});
+
+test('unusual but legal option names are not parse errors', () => {
+  assert.ok(parsesCleanly('[gcode_macro A]\ngcode:\n  G28\nvariable_température: 1\nvariable_foo bar: 2\n'));
+  assert.ok(parsesCleanly('[gcode_macro A]\ngcode:\n  G28\nvariable_1st: 1\n'));
+  assert.ok(parsesCleanly('[some_module]\nvitesse_é: 1\n'));
+});
+
+test('text at column 0 inside a macro is still reported', () => {
+  for (const line of ['G1 X10 F3000: go', '{% set x = 1 %}', 'G28']) {
+    const r = analyze(`[printer]\nkinematics: none\nmax_velocity: 1\nmax_accel: 1\n[input_shaper]\n[gcode_macro A]\ngcode:\n  G28\n${line}\n`);
+    assert.ok(ids(r.config).includes('gcode-unindented'), line);
+  }
+});
+
+test('comments: semicolon needs whitespace before it, # does not, and neither ends a value', () => {
+  const r = analyze('[printer]\nkinematics: none;x\nmax_velocity: 1 ; y\nmax_accel: 1 # z\n; a\n# b\n  ; c\n[input_shaper]\n[stepper_x]\n');
+  assert.deepEqual(r.config.filter((f) => f.severity === 'error'), []);
+});
+
+test('SAVE_CONFIG and [include] in one file: the block merges, the include is noted, the repeat is found', () => {
+  const r = analyze(fixture('includes-save.cfg'), { filename: 'printer.cfg' });
+  assert.deepEqual(ids(r.config).sort(), ['includes-not-read', 'save-config-duplicate']);
+  assert.match(r.config.find((f) => f.id === 'save-config-duplicate').title, /pid_kp/);
+});
+
+test('CRLF in a printer.cfg changes nothing', () => {
+  assert.deepEqual(analyze(fixture('crlf.cfg'), { filename: 'printer.cfg' }).config, []);
+});
+
+test('BOM in a printer.cfg: the first section is read, and the report says Klipper itself would refuse it', () => {
+  const r = analyze(fixture('bom.cfg'), { filename: 'printer.cfg' });
+  const errs = r.config.filter((f) => f.severity === 'error');
+  assert.deepEqual(ids(errs), ['unparseable-line']);
+  assert.match(errs[0].detail, /byte order mark|BOM/);
+  assert.equal(errs[0].evidence[0].line, 1);
+});
+
+// ---- False errors: a file Klipper accepts must not produce an error. ----
+
+test('a fragment with no [printer] is not told it is missing [printer] options', () => {
+  const r = analyze(fixture('fragment.cfg'), { filename: 'fragment.cfg' });
+  assert.deepEqual(r.config.filter((f) => f.severity === 'error'), []);
+  assert.deepEqual(ids(r.config), ['config-fragment']);
+  assert.equal(r.config[0].severity, 'note');
+});
+
+test('a complete dump with no [printer] in a log is still an error: that is the whole config', () => {
+  const log = 'Start printer at Sun Nov  1 10:00:00 2026 (1793527200.0 5000.0)\n===== Config file =====\n[mcu]\nserial = /dev/x\n=======================\n';
+  assert.ok(ids(analyze(log).config).includes('missing-required'));
+});
+
+test('a config dump cut off by the end of the file gets a note, never missing-required', () => {
+  const r = analyze(fixture('dump-cut-off.log'));
+  assert.deepEqual(r.config.filter((f) => f.severity === 'error'), []);
+  const note = r.config.find((f) => f.id === 'no-config-dump');
+  assert.match(note.title, /cut off/);
+  assert.ok(!ids(r.config).includes('no-input-shaper'));
+});
+
+test('a dump with no end marker does not swallow the Klipper start after it', () => {
+  const r = analyze(fixture('dump-cut-off-then-start.log'));
+  assert.equal(r.meta.sessions, 2);
+  assert.deepEqual(r.config, []);
+  assert.deepEqual(ids(r.crash), ['no-failure-found']);
+});
+
+test('a running Klipper old enough to use step_distance is not told it is missing rotation_distance', () => {
+  const r = analyze(fixture('old-step-distance.log'));
+  assert.ok(!ids(r.config).includes('missing-required'));
+  assert.equal(r.config.find((f) => f.id === 'removed-option').severity, 'warning');
+});
+
+test('a shared_heater extruder from before its removal is not told it is missing heater options', () => {
+  const r = analyze(fixture('shared-heater.log'));
+  assert.ok(!ids(r.config).includes('missing-required'));
+  assert.match(r.config.find((f) => f.id === 'removed-option').title, /shared_heater/);
+});
+
+test('gear_ratio with no rotation_distance is what stepper.py reads as radians: not a missing option', () => {
+  const stepper = (n) => `[stepper_${n}]\nstep_pin: PA1\ndir_pin: PA2\nmicrosteps: 16\ngear_ratio: 80:20\nendstop_pin: PA3\nposition_endstop: 0\nposition_max: 200\n`;
+  const r = analyze(`[printer]\nkinematics: cartesian\nmax_velocity: 1\nmax_accel: 1\n[input_shaper]\n${stepper('x')}${stepper('y')}${stepper('z')}`);
+  assert.deepEqual(r.config, []);
+});
+
+test('endstop-range does not read a blank value as zero', () => {
+  const r = analyze('[printer]\nkinematics: cartesian\nmax_velocity: 1\nmax_accel: 1\n[input_shaper]\n[stepper_x]\nstep_pin: A\ndir_pin: B\nmicrosteps: 16\nrotation_distance: 40\nendstop_pin: C\nposition_endstop:\nposition_max: 200\nposition_min: 10\n');
+  assert.ok(!ids(r.config).includes('endstop-range'));
+});
+
+test('endstop-range does not accept hex, which Python float() rejects', () => {
+  const r = analyze('[printer]\nkinematics: cartesian\nmax_velocity: 1\nmax_accel: 1\n[input_shaper]\n[stepper_x]\nstep_pin: A\ndir_pin: B\nmicrosteps: 16\nrotation_distance: 40\nendstop_pin: C\nposition_endstop: 0x500\nposition_max: 200\n');
+  assert.ok(!ids(r.config).includes('endstop-range'));
+});
+
+// ---- Config_Changes.md, read in full on this audit ----
+
+test('removed-option covers every older removal that names an option', () => {
+  const r = analyze(fixture('removed-old-options.cfg'), { filename: 'printer.cfg' });
+  const titles = find(r, 'removed-option').map((f) => f.title).join('\n');
+  for (const want of [
+    'color_order_grb', 'enable was removed', 'min_point', 'max_point', 'bed_radius', 'radius was removed', 'bed_shape',
+    'samples was removed from Klipper in [bed_mesh]', 'sample_retract_dist', 'samples_result',
+    'samples was removed from Klipper in [z_tilt]', 'activate_gcode', 'deactivate_gcode',
+    'pressure_advance_lookahead_time', 'z_hop', 'xy_skew', 'address', 'driver_vsense', 'driver_blank_time_select',
+    'endstop_phase was removed', 'lcd_type: st7567',
+  ]) assert.ok(titles.includes(want), `missing ${want}`);
+});
+
+test('options that moved stay valid in their new home', () => {
+  const r = analyze('[printer]\nkinematics: none\nmax_velocity: 1\nmax_accel: 1\n[input_shaper]\n[probe]\npin: PA1\nz_offset: 1\nsamples: 3\nsamples_result: median\nsample_retract_dist: 2\n[neopixel a]\npin: PA2\ncolor_order: GRB\n[servo a]\npin: PA3\n[endstop_phase stepper_z]\ntrigger_phase: 1/2\n[display]\nlcd_type: uc1701\n[bed_mesh]\nmesh_min: 1, 1\nmesh_max: 2, 2\nprobe_count: 3, 3\n[bed_mesh default]\nversion: 1\n');
+  assert.deepEqual(find(r, 'removed-option'), []);
+});
+
+test('removal dates from before v0.10.0 are known too, so a recent log can be sure', () => {
+  const log = (cfg) => `Git version: 'v0.11.0-1-g1a2b3c4d'\nStart printer at Sun Nov  1 10:00:00 2026 (1793527200.0 5000.0)\n===== Config file =====\n[printer]\nkinematics = none\nmax_velocity = 1\nmax_accel = 1\n[input_shaper]\n${cfg}=======================\n`;
+  assert.equal(find(analyze(log('[servo a]\npin = PA1\nenable = True\n')), 'removed-option')[0].severity, 'error');
+});

@@ -1,4 +1,4 @@
-import { KLIPPER_DOCS } from '../types.js';
+import { configNumber, KLIPPER_DOCS } from '../types.js';
 // docs/TMC_Drivers.md, "Setting spreadCycle vs stealthChop Mode": "It is recommended to always use
 // spreadCycle mode (by not specifying stealthchop_threshold) or to always use stealthChop mode (by
 // setting stealthchop_threshold to 999999). Unfortunately, the drivers often produce poor and
@@ -18,7 +18,7 @@ export const tmcStealthchopThreshold = {
             const o = cfg.option(name, 'stealthchop_threshold');
             if (!o)
                 continue;
-            const v = Number(o.value);
+            const v = configNumber(o.value);
             if (!Number.isFinite(v) || v === 0 || v === 999999)
                 continue;
             hits.push({

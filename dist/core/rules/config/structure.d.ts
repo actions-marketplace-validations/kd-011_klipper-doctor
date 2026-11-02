@@ -5,3 +5,4 @@ export declare const saveConfigDuplicate: ConfigRule;
 export declare const gcodeUnindented: ConfigRule;
 export declare const unparseableLine: ConfigRule;
 export declare const includesNotRead: ConfigRule;
+export declare const configFragment: ConfigRule;

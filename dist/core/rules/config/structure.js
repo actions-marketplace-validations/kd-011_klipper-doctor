@@ -87,16 +87,19 @@ export const saveConfigDuplicate = {
     docs: CONFIGFILE,
     check({ cfg, lineText }) {
         const hits = [];
+        // The last value for each option of each section in the main config.
+        const main = new Map();
+        for (const s of cfg.sections) {
+            if (s.saveConfig)
+                continue;
+            for (const o of s.options)
+                main.set(s.name + '\u0000' + o.name, o);
+        }
         for (const s of cfg.sections) {
             if (!s.saveConfig)
                 continue;
             for (const o of s.options) {
-                const main = cfg
-                    .sectionsNamed(s.name)
-                    .filter((x) => !x.saveConfig)
-                    .flatMap((x) => x.options)
-                    .filter((x) => x.name === o.name);
-                const last = main[main.length - 1];
+                const last = main.get(s.name + '\u0000' + o.name);
                 if (!last)
                     continue;
                 hits.push({
@@ -147,7 +150,7 @@ export const unparseableLine = {
     scope: 'raw',
     severity: 'error',
     title: 'Line Klipper cannot parse',
-    detail: 'A line outside any indented block has no ":" or "=", or sits before the first [section]. Klipper stops with a config parse error.',
+    detail: 'A line outside any indented block has no ":" or "=", has text in its option name that belongs in a macro, or sits before the first [section]. Klipper stops at startup with a config error.',
     fix: 'Make it an "option: value" line, indent it if it continues the line above, or comment it out with #.',
     docs: CONFIGFILE,
     check({ cfg }) {
@@ -157,7 +160,7 @@ export const unparseableLine = {
                 continue;
             hits.push({
                 title: `Line ${p.line} cannot be parsed`,
-                detail: `Line ${p.line} is not a [section], an "option: value" pair or an indented continuation, so Klipper's config reader rejects the file.`,
+                detail: `Line ${p.line} is not a [section], an "option: value" pair or an indented continuation, so Klipper stops at startup with a config error.`,
                 fix: `Fix or comment out line ${p.line}.`,
                 evidence: [{ line: p.line, text: p.text }],
             });
@@ -181,5 +184,22 @@ export const includesNotRead = {
                 evidence: cfg.includes.map((i) => ({ line: i.line, text: lineText(i.line) })),
             },
         ];
+    },
+};
+// A file with no [printer] cannot start Klipper by itself: "Option 'kinematics' in section 'printer'
+// must be specified" (klippy/toolhead.py). Klipper's own config/sample-*.cfg files are like this, because
+// they are meant for [include]. Treat it as a part of a config, and skip what needs the whole.
+export const configFragment = {
+    id: 'config-fragment',
+    scope: 'raw',
+    severity: 'note',
+    title: 'File has no [printer] section',
+    detail: 'A complete Klipper config has a [printer] section, so this looks like a file meant for [include]. It was checked on its own, and rules that need the whole config were skipped.',
+    fix: 'Run klipper-doctor on klippy.log to check the whole config, with includes merged.',
+    docs: KLIPPER_SRC + 'klippy/configfile.py',
+    check({ cfg }) {
+        if (cfg.hasSection('printer') || cfg.includes.length > 0 || cfg.sections.length === 0)
+            return [];
+        return [{ evidence: [] }];
     },
 };

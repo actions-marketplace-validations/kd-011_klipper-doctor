@@ -19,7 +19,7 @@ export const heaterVerify = {
         const gainTime = name === 'heater_bed' ? 60 : 20;
         return {
             title: `Heater ${name} not heating at expected rate`,
-            detail: `Klipper's verify_heater check shut the printer down because ${name} was not heating as expected. By default it expects the heater to gain 2 C every ${gainTime} s while it climbs to its target, and gives up when the accumulated shortfall below target reaches 120 (the heating_gain, check_gain_time and max_error settings, in [verify_heater ${name}]). That means the heater was not delivering heat, or the sensor was not reporting it.`,
+            detail: `Klipper's verify_heater check shut the printer down because ${name} was not heating as expected. By default it expects the heater to gain 2 C every ${gainTime} s while it climbs to its target, and gives up when the accumulated shortfall below target reaches 120 (the heating_gain, check_gain_time and max_error settings, in [verify_heater ${name}]). The same check fires when a heater that reached its target cannot hold it. That means the heater was not delivering heat, or the sensor was not reporting it.`,
             evidence: [hit.ev, ...(ctx.shutdown && ctx.shutdown.line !== hit.ev.line ? [ctx.shutdown] : [])],
         };
     },

@@ -1,5 +1,5 @@
 import type { Evidence, Hit } from '../../types.js';
-import type { CrashContext, CrashRule } from '../types.js';
+import type { Cause, CrashContext, CrashRule } from '../types.js';
 import { KLIPPER_DOCS, KLIPPER_SRC } from '../types.js';
 
 // Message strings are copied from the Klipper source:
@@ -26,11 +26,22 @@ const uniq = (evs: (Evidence | undefined)[]): Evidence[] => {
   return out;
 };
 
-/** "MCU 'mcu' shutdown: <reason>" names the MCU that stopped. */
-function mcuName(ctx: CrashContext, fallback = 'mcu'): string {
-  const hit = ctx.match(/\bMCU '([^']+)' shutdown: /);
-  return hit?.m[1] ?? fallback;
+/** The session's cause, when an MCU reported it and it starts with one of Klipper's own prefixes. */
+function mcuCause(ctx: CrashContext, ...prefixes: string[]): Cause | undefined {
+  const c = ctx.cause;
+  return c?.mcu && prefixes.some((p) => c.reason.startsWith(p)) ? c : undefined;
 }
+
+// extras/error_mcu.py writes "Previous MCU" when the MCU says it was already shut down at connect.
+const PREVIOUS = ' The MCU reported this as a previous shutdown, so the fault happened before this Klipper start.';
+const PREVIOUS_FIX = ' Then run FIRMWARE_RESTART, as Klipper asks, to clear the old shutdown.';
+
+/** Adds the "already shut down" note to a rule's text, when it applies. */
+function aboutCause(c: Cause, detail: string, fix: string): { detail: string; fix: string } {
+  return c.previous ? { detail: detail + PREVIOUS, fix: fix + PREVIOUS_FIX } : { detail, fix };
+}
+
+const timerTooCloseFix = 'Check the host for processes using a lot of CPU, high swap use, disk errors, overheating or unstable power, then run FIRMWARE_RESTART.';
 
 export const timerTooClose: CrashRule = {
   id: 'mcu-timer-too-close',
@@ -38,17 +49,19 @@ export const timerTooClose: CrashRule = {
   title: 'Timer too close',
   detail:
     'The micro-controller shut down because a command reached it after the time it was meant to run. Klipper says this often means the host computer is overloaded.',
-  fix: 'Check the host for processes using a lot of CPU, high swap use, disk errors, overheating or unstable power, then run FIRMWARE_RESTART.',
+  fix: timerTooCloseFix,
   docs: ERROR_MCU,
   check(ctx) {
-    const hit = ctx.match(/\bTimer too close\b/);
-    if (!hit) return null;
+    const c = mcuCause(ctx, 'Timer too close');
+    if (!c) return null;
     return {
-      detail: `MCU '${mcuName(ctx)}' shut down with "Timer too close": a command reached it after the time it was scheduled to run. Klipper's own hint is that this often indicates the host computer is overloaded: other processes using too much CPU, high swap use, disk errors, overheating or unstable voltage.`,
-      evidence: uniq([hit.ev, ctx.shutdown]),
+      ...aboutCause(c, `MCU '${c.mcu}' shut down with "Timer too close": a command reached it after the time it was scheduled to run. Klipper's own hint is that this often indicates the host computer is overloaded: other processes using too much CPU, high swap use, disk errors, overheating or unstable voltage.`, timerTooCloseFix),
+      evidence: uniq([c.ev, ctx.shutdown]),
     };
   },
 };
+
+const missedSchedulingFix = 'Work through the "Lost communication with MCU" hardware checklist: USB cable, power supply, wiring.';
 
 export const missedScheduling: CrashRule = {
   id: 'mcu-missed-scheduling',
@@ -56,14 +69,14 @@ export const missedScheduling: CrashRule = {
   title: 'Missed scheduling of next event',
   detail:
     'The micro-controller did not get the next command in time. Klipper says this points to an intermittent communication failure between the micro-controller and the host.',
-  fix: 'Work through the "Lost communication with MCU" hardware checklist: USB cable, power supply, wiring.',
+  fix: missedSchedulingFix,
   docs: FAQ + '#i-keep-getting-random-lost-communication-with-mcu-errors',
   check(ctx) {
-    const hit = ctx.match(/Missed scheduling of next (.+)$/);
-    if (!hit) return null;
+    const c = mcuCause(ctx, 'Missed scheduling of next ');
+    if (!c) return null;
     return {
-      detail: `MCU '${mcuName(ctx)}' shut down with "Missed scheduling of next ${hit.m[1]}". Klipper's hint is that this is generally an intermittent communication failure between the micro-controller and the host.`,
-      evidence: uniq([hit.ev, ctx.shutdown]),
+      ...aboutCause(c, `MCU '${c.mcu}' shut down with "${c.reason}". Klipper's hint is that this is generally an intermittent communication failure between the micro-controller and the host.`, missedSchedulingFix),
+      evidence: uniq([c.ev, ctx.shutdown]),
     };
   },
 };
@@ -101,11 +114,14 @@ export const connectFailed: CrashRule = {
     const name = /mcu '([^']+)'/.exec(hit.ev.text)?.[1] ?? 'mcu';
     const opens = ctx.findAll(/Unable to open (?:serial |CAN )?port: /, 500);
     const open = opens[opens.length - 1];
-        const missing = !!open && /No such file or directory/.test(open.text);
+    const missing = !!open && /No such file or directory/.test(open.text);
+    const can = !!ctx.find(/Starting CAN connect|Unable to open CAN port: /);
     let detail = `Klipper could not connect to MCU '${name}' within 90 seconds ("Unable to connect").`;
     let fix = 'Check the board is powered and plugged in, that the serial path in [mcu] matches `ls /dev/serial/by-id/*`, and that the board has Klipper firmware.';
     if (open) detail += ` The last port error was: ${open.text.replace(/^mcu '[^']*': /, '').replace(/[.]?$/, '.')}`;
-    if (missing) {
+    if (can) {
+      fix = 'Check that the CAN interface is up, the board is powered and on the bus, and that canbus_uuid in the [mcu] section matches the board (see the CANBUS docs).';
+    } else if (missing) {
       detail += ` That path does not exist, so the board is not showing up under that name.`;
       fix = 'Run `ls /dev/serial/by-id/*` on the host and copy the name it prints into serial: under [mcu]. If nothing is listed, check the USB cable and board power.';
     }
@@ -113,27 +129,33 @@ export const connectFailed: CrashRule = {
   },
 };
 
+const adcFix = 'Check the sensor and its wiring, and that sensor_type and sensor_pin match the sensor.';
+
 export const adcOutOfRange: CrashRule = {
   id: 'mcu-adc-out-of-range',
   severity: 'error',
   title: 'ADC out of range',
   detail:
     'A temperature sensor reading went outside its configured min_temp / max_temp, so the micro-controller shut everything down.',
-  fix: 'Check the sensor and its wiring, and that sensor_type and sensor_pin match the sensor.',
+  fix: adcFix,
   docs: ERROR_MCU,
   check(ctx) {
-    const hit = ctx.match(/\bADC out of range\b/);
-    if (!hit) return null;
+    const c = mcuCause(ctx, 'ADC out of range');
+    if (!c) return null;
     const clar = ctx.match(/Sensor '([^']+)' temperature (\S+) not in range (\S+):(\S+)/);
     let detail =
       'A temperature sensor reading went outside the range set by min_temp and max_temp, so the micro-controller shut down ("ADC out of range"). Klipper says this generally occurs when a heater temperature goes beyond its configured min_temp or max_temp.';
     if (clar) {
       const [, sensor, temp, min, max] = clar.m;
-      detail = `Sensor '${sensor}' read ${temp} C, outside its allowed range ${min}:${max} C, so the micro-controller shut down ("ADC out of range"). Klipper reads min_temp and max_temp from that sensor's section in the config.`;
+      // extras/adc_temperature.py writes "?" when it cannot turn the reading into a temperature.
+      const read = temp === '?' ? 'had a reading Klipper could not turn into a temperature' : `read ${temp} C`;
+      detail = `Sensor '${sensor}' ${read}, outside its allowed range ${min}:${max} C, so the micro-controller shut down ("ADC out of range"). Klipper reads min_temp and max_temp from that sensor's section in the config.`;
     }
-    return { detail, evidence: uniq([clar?.ev, hit.ev, ctx.shutdown]) };
+    return { ...aboutCause(c, detail, adcFix), evidence: uniq([clar?.ev, c.ev, ctx.shutdown]) };
   },
 };
+
+const stepRateFix = 'Lower the speed or acceleration limits, or use fewer microsteps on the axis that was moving.';
 
 export const stepRate: CrashRule = {
   id: 'mcu-step-rate',
@@ -141,17 +163,44 @@ export const stepRate: CrashRule = {
   title: 'Stepping faster than the MCU can manage',
   detail:
     '"Rescheduled timer in the past" and "Stepper too far in past" mean the micro-controller was asked to step at a higher rate than it can produce.',
-  fix: 'Lower the speed or acceleration limits, or use fewer microsteps on the axis that was moving.',
+  fix: stepRateFix,
   docs: KLIPPER_DOCS + 'Benchmarks.html',
   check(ctx) {
-    const hit = ctx.match(/\b(Rescheduled timer in the past|Stepper too far in past)\b/);
-    if (!hit) return null;
+    const c = mcuCause(ctx, 'Rescheduled timer in the past', 'Stepper too far in past');
+    if (!c) return null;
     return {
-      detail: `MCU '${mcuName(ctx)}' shut down with "${hit.m[1]}". Klipper's hint is that this generally occurs when the micro-controller has been asked to step at a rate higher than it can reach. The step rate is steps per second, which grows with speed and with microsteps.`,
-      evidence: uniq([hit.ev, ctx.shutdown]),
+      ...aboutCause(c, `MCU '${c.mcu}' shut down with "${c.reason}". Klipper's hint is that this generally occurs when the micro-controller has been asked to step at a rate higher than it can reach. The step rate is steps per second, which grows with speed and with microsteps.`, stepRateFix),
+      evidence: uniq([c.ev, ctx.shutdown]),
     };
   },
 };
+
+// src/basecmd.c answers an emergency_stop command with "Command request", and klippy/mcu.py sends that
+// command to every MCU on any shutdown. So this rule only fires when the stop itself was the event:
+// the MCU named it first, or the host says who asked: gcode.py "Shutdown due to M112 command",
+// webhooks.py "Shutdown due to webhooks request" (the emergency_stop endpoint, docs/API_Server.md),
+// extras/gcode_macro.py "Shutdown due to %s" and extras/display/menu_keys.py "Shutdown due to kill button!".
+const STOP_FIX = 'Find what sent M112 (a macro, a slicer end script, a button), or check the log above for a host error.';
+
+function askedToStop(reason: string): { detail: string; fix: string } | undefined {
+  if (!reason.startsWith('Shutdown due to ')) return undefined;
+  if (reason.includes('M112')) {
+    return {
+      detail: `Klipper shut down because it received an M112 G-code command, the emergency stop ("${reason}"). The "Command request" the MCUs report after that only confirms the stop.`,
+      fix: 'Find what sent M112: a macro, a slicer script or a button.',
+    };
+  }
+  if (reason.includes('webhooks')) {
+    return {
+      detail: `Klipper shut down because its API received an emergency stop ("${reason}"). That is the request a web interface sends from its emergency stop button. The "Command request" the MCUs report after that only confirms the stop.`,
+      fix: 'If nobody pressed emergency stop, look for another program or macro using Klipper\'s API. Then run FIRMWARE_RESTART.',
+    };
+  }
+  return {
+    detail: `Klipper shut down on request ("${reason}"). The "Command request" the MCUs report after that only confirms the stop.`,
+    fix: 'Find what asked for the emergency stop, then run FIRMWARE_RESTART.',
+  };
+}
 
 export const commandRequest: CrashRule = {
   id: 'mcu-command-request',
@@ -159,14 +208,21 @@ export const commandRequest: CrashRule = {
   title: 'Shutdown requested by command',
   detail:
     'The micro-controller shut down on request. Klipper says this occurs in response to an M112 G-code command or an internal error in the host software.',
-  fix: 'Find what sent M112 (a macro, a slicer end script, a button), or check the log above for a host error.',
+  fix: STOP_FIX,
   docs: ERROR_MCU,
   check(ctx) {
-    const hit = ctx.match(/shutdown: Command request\b/);
-    if (!hit) return null;
+    const c = ctx.cause;
+    if (!c) return null;
+    const asked = c.mcu ? undefined : askedToStop(c.reason);
+    if (asked) {
+      // Stopping a printer that had already failed to start is not what went wrong with it.
+      if (ctx.find(/^(?:Config error|Protocol error|MCU error during connect|Unhandled exception during connect)/)) return null;
+      return { ...asked, evidence: uniq([c.ev, ctx.shutdown]) };
+    }
+    if (!mcuCause(ctx, 'Command request')) return null;
     return {
-      detail: `MCU '${mcuName(ctx)}' shut down with "Command request". Klipper's hint is that this occurs in response to an M112 G-code command (emergency stop) or an internal error in the host software, so the cause is in what was sent, not in the hardware.`,
-      evidence: uniq([hit.ev, ctx.shutdown]),
+      ...aboutCause(c, `MCU '${c.mcu}' shut down with "Command request". Klipper's hint is that this occurs in response to an M112 G-code command (emergency stop) or an internal error in the host software, so the cause is in what was sent, not in the hardware.`, STOP_FIX),
+      evidence: uniq([c.ev, ctx.shutdown]),
     };
   },
 };

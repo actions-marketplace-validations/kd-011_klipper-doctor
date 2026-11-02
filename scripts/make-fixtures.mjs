@@ -369,8 +369,144 @@ ${hostShutdown('Heater extruder not heating at expected rate\nSee the \'verify_h
       .replace('stealthchop_threshold = 999999', 'stealthchop_threshold = 500'),
   }));
 
+// ---- Shapes seen in publicly posted logs. Rebuilt here from the message formats, never copied. ----
+
+const HOST_TRACE = (exception) => `Traceback (most recent call last):
+  File "/home/pi/klipper/klippy/gcode.py", line 212, in _process_commands
+    handler(gcmd)
+${exception}`;
+
+add('heater-then-command-request.log', 'A heater shutdown. The host stops the MCU, which then reports Command request: an effect, not the cause', 'extras/verify_heater.py, mcu.py _shutdown, src/basecmd.c',
+  session(goodRun(5010, 2) + `\nHeater extruder not heating at expected rate\n${hostShutdown('Heater extruder not heating at expected rate')}\nMCU 'mcu' shutdown: Command request\n${serialDump}`));
+
+add('mcu-fault-then-command-request.log', 'An MCU reason no rule knows, with the second MCU reporting Command request first (current log format)', 'src/thermocouple.c, mcu.py _analyze_shutdown, extras/error_mcu.py',
+  session(goodRun(5010, 2) + `\nTransition to shutdown state: MCU shutdown\nDumping gcode input 0 blocks\nMCU 'rpi' shutdown: Command request\n${serialDump}\nMCU 'mcu' shutdown: Thermocouple reader fault\n${serialDump}${FIRMWARE_RESTART_TAIL}`));
+
+add('timer-on-second-mcu.log', 'Timer too close on the main MCU, listed after an MCU with no reason and one reporting Command request', 'src/sched.c, mcu.py _analyze_shutdown',
+  session(goodRun(5010, 2) + `\nTransition to shutdown state: MCU shutdown\nDumping gcode input 0 blocks\nMCU 'toolhead' shutdown: \n${serialDump}\nMCU 'rpi' shutdown: Command request\n${serialDump}\nMCU 'mcu' shutdown: Timer too close\n${HINT_TIMER}${FIRMWARE_RESTART_TAIL}`));
+
+add('timer-old-format.log', 'The format before extras/error_mcu.py: the reason is on the Transition line, and a second MCU follows', 'older klippy/mcu.py',
+  session(goodRun(5010, 2) + `\nTransition to shutdown state: MCU 'mcu' shutdown: Timer too close\nMCU 'mcu' shutdown: Timer too close\n${serialDump}\nMCU 'rpi' shutdown: Command request\n${serialDump}`));
+
+add('estop-webhooks.log', 'Emergency stop through the API, which every MCU then reports as Command request', 'webhooks.py, docs/API_Server.md',
+  session(goodRun(5010, 2) + `\n${hostShutdown('Shutdown due to webhooks request')}\nMCU 'mcu' shutdown: Command request\n${serialDump}`));
+
+add('estop-m112.log', 'M112, which every MCU then reports as Command request', 'gcode.py cmd_M112',
+  session(goodRun(5010, 2) + `\n${hostShutdown('Shutdown due to M112 command')}\nMCU 'mcu' shutdown: Command request\n${serialDump}`));
+
+add('internal-error-then-command-request.log', 'A Python exception in a G-code command: the traceback names the fault, Command request follows it', 'gcode.py _process_commands',
+  session(goodRun(5010, 2) + `\nInternal error on command:"BED_SCREWS_ADJUST"\n${HOST_TRACE("AttributeError: 'NoneType' object has no attribute 'get_status'")}\n${hostShutdown('Internal error on command:"BED_SCREWS_ADJUST"')}\nMCU 'mcu' shutdown: Command request\n${serialDump}`));
+
+add('host-reason-no-rule.log', 'A host shutdown reason no rule knows, followed by stepcompress errors and Command request', 'mcu.py send_with_response, stepper.py',
+  session(goodRun(5010, 2) + `\n${hostShutdown("Timeout on wait for 'tmcuart_response' response")}\nMCU 'mcu' shutdown: Command request\n${serialDump}\nInternal error on command:"G1"\n${HOST_TRACE('stepper.error: Internal error in stepcompress')}`));
+
+add('lost-communication-cascade.log', 'Lost communication, then the errors it causes: stepcompress, TMC reads, Command request', 'mcu.py check_timeout, stepper.py, extras/tmc_uart.py',
+  session(goodRun(5010, 2) + `\nTimeout with MCU 'mcu' (eventtime=5014.912345)\n${hostShutdown("Lost communication with MCU 'mcu'")}\n${serialDump}\nMCU 'rpi' shutdown: Command request\nstepcompress o=6 i=0 c=29 a=0: Invalid sequence\nInternal error on command:"G1"\n${HOST_TRACE('stepper.error: Internal error in stepcompress')}\nUnable to read tmc uart 'stepper_x' register GSTAT`));
+
+add('adc-then-tmc.log', 'ADC out of range, then a TMC read failing because the MCU is already shut down', 'src/adccmds.c, extras/tmc_uart.py',
+  session(goodRun(5010, 2) + `\n${mcuShutdown('ADC out of range', `\nSensor 'extruder' temperature 19.120 not in range 180.000:350.000\n`)}\nUnable to read tmc uart 'stepper_x' register GSTAT`));
+
+add('dump-noise.log', 'A shutdown followed by the request dumps, whose text quotes other failure messages', 'mcu.py check_timeout, webhooks.py, gcode.py dump_debug',
+  session(goodRun(5010, 2) + `\nTimeout with MCU 'mcu' (eventtime=5014.912345)\n${hostShutdown("Lost communication with MCU 'mcu'")}\nDumping gcode input 1 blocks\nRead 5014.1: 'M117 Timer too close\\n'\nDumping 2 requests for client 1\nReceived 5014.2: b'{"method": "gcode/script", "params": {"script": "M117 ADC out of range"}}'\nSent 5014.3: b'{"result": "TMC \\'stepper_x\\' reports error: DRV_STATUS: 00000000"}'\nHeater extruder not heating at expected rate\nInternal error in stepcompress\nMCU 'mcu' shutdown: Timer too close`));
+
+add('tmc-failed-to-init.log', 'A TMC driver that did not answer at startup, then a healthy run: logged at info level and not fatal', 'extras/tmc.py _handle_connect',
+  session(`TMC stepper_x failed to init: Unable to read tmc uart 'stepper_x' register IFCNT\n${goodRun(5010, 4)}`));
+
+add('tmc-init-then-timer.log', 'The same startup message, then an unrelated Timer too close', 'extras/tmc.py _handle_connect, src/sched.c',
+  session(`TMC stepper_x failed to init: Unable to read tmc uart 'stepper_x' register IFCNT\n${goodRun(5010, 2)}\n${mcuShutdown('Timer too close', HINT_TIMER)}`));
+
+add('tmc-all-ones.log', 'A TMC status of ffffffff, where every flag reads as set: docs/TMC_Drivers.md says this points at SPI', 'extras/tmc.py, docs/TMC_Drivers.md',
+  session(goodRun(5010, 2) + `\n${hostShutdown("TMC 'stepper_x' reports error: DRV_STATUS: ffffffff reset=1(Reset) ot=1(OvertempError!) otpw=1(OvertempWarning!) s2ga=1(ShortToGND_A!) s2gb=1(ShortToGND_B!) cs_actual=31")}`));
+
+add('tmc-cs-actual-reset.log', 'A TMC driver reset, in the lowercase field name extras/tmc2130.py writes', 'extras/tmc2130.py FieldFormatters, docs/TMC_Drivers.md',
+  session(goodRun(5010, 2) + `\n${hostShutdown("TMC 'stepper_y' reports error: DRV_STATUS: 80100000 stst=1 cs_actual=0(Reset?)")}`));
+
+add('connect-mcu-already-shutdown.log', 'MCU error during connect where the reason is only in the traceback', 'klippy.py _connect, mcu.py',
+  session(`MCU error during connect\nTraceback (most recent call last):\n  File "/home/pi/klipper/klippy/klippy.py", line 135, in _connect\n    cb()\nmcu.error: Can not update MCU 'mcu' config as it is shutdown\nCan not update MCU 'mcu' config as it is shutdown\n\nOnce the underlying issue is corrected, use the\n"FIRMWARE_RESTART" command to reset the firmware, reload the\nconfig, and restart the host software.\nError configuring printer`, { mcu: false }));
+
+add('connect-unhandled.log', 'Unhandled exception during connect with an ImportError on the last traceback line', 'klippy.py _connect',
+  session(`Unhandled exception during connect\nTraceback (most recent call last):\n  File "/home/pi/klipper/klippy/klippy.py", line 135, in _connect\n    cb()\nImportError: cannot import name 'soft_unicode' from 'markupsafe'`, { mcu: false }));
+
+add('previous-mcu-shutdown.log', 'An MCU still shut down from before this Klipper start', 'extras/error_mcu.py _check_mcu_shutdown',
+  session(`Transition to shutdown state: MCU shutdown\nPrevious MCU 'mcu' shutdown: ADC out of range\n\nThis generally occurs when a heater temperature exceeds\nits configured min_temp or max_temp.${FIRMWARE_RESTART_TAIL}`));
+
+add('dump-cut-off.log', 'A log that ends part way through the config dump, so most of the config is missing', 'configfile.py log_config',
+  `${START()}\n===== Config file =====\n[mcu]\nserial = /dev/serial/by-id/usb-Klipper_stm32f103xe_ABC123-if00\n\n[stepper_x]\nstep_pin = PB13\n`);
+
+add('dump-cut-off-then-start.log', 'A config dump with no end marker, then a complete Klipper start (two logs joined together)', 'configfile.py log_config, klippy.py run',
+  `${START()}\n===== Config file =====\n[mcu]\nserial = /dev/ttyACM0\n` + session(goodRun(6010, 3), { mono: 6000.0, preamble: false }));
+
+add('old-step-distance.log', 'A running Klipper from before step_distance was removed: the options that replaced it are not required there', 'docs/Config_Changes.md 20211102',
+  session(goodRun(5010, 3), {
+    v: 'v0.9.1-616-g28f60f7e',
+    cfg: CONFIG_DUMP.replace(/microsteps = 16\nrotation_distance = [\d.]+/g, 'step_distance = 0.0125'),
+  }));
+
+add('shared-heater.log', 'A second extruder sharing a heater, valid before shared_heater was removed', 'docs/Config_Changes.md 20240215',
+  session(goodRun(5010, 3), {
+    v: 'v0.10.0-100-g1a2b3c4d',
+    cfg: CONFIG_DUMP + `\n\n[extruder1]\nstep_pin = PA1\ndir_pin = PA2\nmicrosteps = 16\nrotation_distance = 33\nnozzle_diameter = 0.4\nfilament_diameter = 1.75\nshared_heater = extruder`,
+  }));
+
+add('rollover-real-order.log', 'A rotated log in the order queuelogger.py writes it: names sorted, so the config comes before the versions', 'queuelogger.py doRollover, klippy.py _read_config',
+  `${configBlock()}\n${MCU_VERSION_LINES()}\n${PREAMBLE()}\n=============== Log rollover at Mon Nov  2 00:00:00 2026 ===============\n${goodRun(90000, 3)}\n${mcuShutdown('Timer too close', HINT_TIMER)}`);
+
+add('connect-failed-then-estop.log', 'A failed connect, then the user pressing emergency stop: the stop is not what went wrong', 'serialhdl.py connect_uart, webhooks.py',
+  session(`mcu 'mcu': Starting serial connect\nMCU error during connect\nTraceback (most recent call last):\n  File "/home/pi/klipper/klippy/klippy.py", line 135, in _connect\n    cb()\nmcu.error: mcu 'mcu': Unable to connect\nTransition to shutdown state: Shutdown due to webhooks request`, { mcu: false }));
+
+add('other-program-quoting.log', "A log from another program quoting Klipper's messages part way along its lines", 'none, this is not a Klipper log',
+  `2026-11-01 10:00:00,000 [printer.py:state()] - mcu 'mcu': Unable to connect\n2026-11-01 10:00:01,000 [printer.py:state()] - Lost communication with MCU 'mcu'\n`);
+
+add('not-klippy.log', "Another program's log with a .log name: none of the lines Klipper writes", 'none, this is not a Klipper log',
+  `2026-11-01 10:00:00,000 [server.py:main()] - Starting Moonraker...\n2026-11-01 10:00:01,000 [app.py:listen()] - Server listening on port 7125\n`);
+
+add('notes.txt', 'Plain text passed by mistake', 'none, this is not a Klipper file',
+  `Shopping list\nnozzles, 0.4 mm\nmore PLA\nthe bed needs levelling again\n`);
+
+add('fragment.cfg', 'A file meant for [include]: no [printer], and an [extruder] whose other options live in the main config, like config/sample-huvud-v0.61.cfg', 'config/sample-*.cfg',
+  `# fragment\n[mcu toolhead]\nserial: /dev/ttyACM1\n\n[extruder]\nstep_pin: toolhead:PA1\ndir_pin: toolhead:PA2\nrotation_distance: 22\n`);
+
+add('indented.cfg', 'Every option indented: configparser treats equal indents as new options, so this is a valid config', 'lib/configparser RawConfigParser._read',
+  `[printer]\n  kinematics: none\n  max_velocity: 300\n  max_accel: 3000\n\n[input_shaper]\n\tshaper_freq_x: 50\n\tshaper_type_x: mzv\n\n[extruder]\n  step_pin: PA1\n  dir_pin: PA2\n  microsteps: 16\n  rotation_distance: 33\n  nozzle_diameter: 0.4\n  filament_diameter: 1.75\n  heater_pin: PA3\n  sensor_type: EPCOS 100K B57560G104F\n  sensor_pin: PA4\n  control: watermark\n  min_temp: 0\n  max_temp: 250\n`);
+
+add('includes-save.cfg', 'An [include] and a SAVE_CONFIG block in one file, with a repeated option across the two', 'configfile.py',
+  `[include macros.cfg]\n[include hardware/*.cfg]\n\n[printer]\nkinematics: none\nmax_velocity: 300\nmax_accel: 3000\n\n[extruder]\npid_Kp: 10\n\n#*# <---------------------- SAVE_CONFIG ---------------------->\n#*# DO NOT EDIT THIS BLOCK OR BELOW. The contents are auto-generated.\n#*#\n#*# [extruder]\n#*# pid_kp = 26.213\n#*#\n#*# [bed_mesh default]\n#*# version = 1\n#*# points =\n#*# \t  0.1, 0.2\n#*# \t  0.3, 0.4\n`);
+
+add('removed-old-options.cfg', 'One option from every Config_Changes removal added in this audit', 'docs/Config_Changes.md',
+  `[printer]\nkinematics: none\nmax_velocity: 300\nmax_accel: 3000\n[input_shaper]\n\n[neopixel a]\npin: PA1\ncolor_order_GRB: False\n\n[servo a]\npin: PA2\nenable: True\n\n[bed_mesh]\nmesh_min: 1, 1\nmesh_max: 2, 2\nmin_point: 1, 1\nmax_point: 2, 2\nbed_radius: 100\nradius: 100\nbed_shape: round\nsamples: 2\nsample_retract_dist: 2\nsamples_result: average\n\n[z_tilt]\nsamples: 2\n\n[extruder]\nactivate_gcode: T0\ndeactivate_gcode: T1\npressure_advance_lookahead_time: 0.01\n\n[firmware_retraction]\nz_hop: 1\n\n[skew_correction]\nxy_skew: 0.1\n\n[sx1509 a]\naddress: 62\n\n[tmc2660 stepper_x]\ndriver_VSENSE: 1\n\n[tmc2130 stepper_y]\ndriver_BLANK_TIME_SELECT: 1\n\n[endstop_phase stepper_z]\nendstop_phase: 1\n\n[display]\nlcd_type: st7567\n`);
+
 for (const [name, text] of Object.entries(files)) writeFileSync(join(out, name), text);
+
+// ---- Input that is damaged or is not what it claims to be. These are not assembled by add() because
+// they must hold exact bytes, or because the header comment would change what they test. ----
+const clean = files['timer-too-close.log'];
+
+writeFileSync(join(out, 'fork-prefix.log'), clean.split('\n').map((l) => (l && !l.startsWith('#') ? `[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] ${l}` : l)).join('\n'));
+writeFileSync(join(out, 'empty.log'), '');
+writeFileSync(join(out, 'empty.cfg'), '');
+writeFileSync(join(out, 'blank.cfg'), '\n   \n\t\n');
+writeFileSync(join(out, 'bom.log'), '\ufeff' + clean);
+writeFileSync(join(out, 'bom.cfg'), '\ufeff[printer]\nkinematics: none\nmax_velocity: 1\nmax_accel: 1\n[input_shaper]\n');
+writeFileSync(join(out, 'crlf.cfg'), '[printer]\r\nkinematics: none\r\nmax_velocity: 1\r\nmax_accel: 1\r\n[input_shaper]\r\n[gcode_macro A]\r\ngcode:\r\n  G28\r\n\r\n  G1 X1\r\n');
+// A log edited on several systems: CRLF, LF, a lone CR, and CR CR LF from a double conversion.
+writeFileSync(join(out, 'mixed-endings.log'), clean.split('\n').map((l, i) => l + ['\r\n', '\n', '\r', '\r\r\n'][i % 4]).join(''));
+writeFileSync(join(out, 'invalid-utf8.log'), Buffer.concat([Buffer.from(clean.slice(0, clean.indexOf('Transition to'))), Buffer.from([0xff, 0xfe, 0x80, 0xc3, 0x28, 0x0a]), Buffer.from(clean.slice(clean.indexOf('Transition to')))]));
+// Power loss on an SD card leaves a run of NUL bytes where the tail of the file was, and the next
+// start is written straight after it on the same line.
+writeFileSync(join(out, 'power-loss-nul.log'), files['clean.log'] + '\0'.repeat(8192) + files['timer-too-close.log'].replace(/^#.*\n/gm, ''));
+// PowerShell's "Get-Content klippy.log > copy.log" writes UTF-16 with a BOM.
+writeFileSync(join(out, 'utf16.log'), Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from(clean, 'utf16le')]));
+// Deterministic noise, so the fixture never changes between runs: a gzip header, and raw bytes.
+const noise = Buffer.alloc(4096);
+for (let i = 0, x = 12345; i < noise.length; i++) {
+  x = (x * 1103515245 + 12345) & 0x7fffffff;
+  noise[i] = x >> 16 & 255;
+}
+writeFileSync(join(out, 'binary.gz'), Buffer.concat([Buffer.from([0x1f, 0x8b, 0x08, 0x00]), noise]));
+writeFileSync(join(out, 'binary-named.log'), noise);
+writeFileSync(join(out, 'nul-only.cfg'), Buffer.alloc(1024));
+
 
 // CRLF copy of the clean log (Windows editors, some download paths).
 writeFileSync(join(out, 'crlf.log'), files['clean.log'].replace(/\n/g, '\r\n').replace('# fixture: one complete', '# fixture: CRLF copy of clean.log, one complete'));
-console.log(`wrote ${Object.keys(files).length + 1} fixtures to ${out}`);
+console.log(`wrote the fixtures to ${out}`);

@@ -112,7 +112,7 @@ cat klippy.log | klipper-doctor -    # read stdin
 
 Exit code is 1 when any finding is an error, 0 otherwise, and 2 for a usage or read error.
 
-Klipper writes the parsed config into `klippy.log` at the start of every run, so one log gives you both reports. When the log holds several Klipper starts, the last one is analysed and the count is reported.
+Klipper writes the parsed config into `klippy.log` at the start of every run, so one log gives you both reports. When the log holds several Klipper starts, the last one is analysed and the count is reported. If the last one is clean, the report names the latest earlier session that failed, since Klipper has often been restarted before the log was grabbed.
 
 ### As a library
 
@@ -167,7 +167,9 @@ Every rule is taken from the Klipper docs or source. The crash rules match messa
 | `tmc-stealthchop-threshold` | config | note | stealthchop_threshold switches modes while moving | [docs](https://www.klipper3d.org/TMC_Drivers.html#setting-spreadcycle-vs-stealthchop-mode) |
 | `no-input-shaper` | config | note | No [input_shaper] section | [docs](https://www.klipper3d.org/Resonance_Compensation.html) |
 | `includes-not-read` | config | note | Included files were not read | [docs](https://github.com/Klipper3d/klipper/blob/master/klippy/configfile.py) |
+| `config-fragment` | config | note | File has no [printer] section | [docs](https://github.com/Klipper3d/klipper/blob/master/klippy/configfile.py) |
 | `no-config-dump` | config | note | No config dump in the log | [docs](https://github.com/Klipper3d/klipper/blob/master/klippy/configfile.py) |
+| `unusable-input` | config | error | Not a Klipper log or config | [docs](https://www.klipper3d.org/FAQ.html) |
 <!-- rules:end -->
 
 Message strings were checked against Klipper's `master` branch on 2026-11-02. Older Klipper versions can word a message differently, and the tool says so when a rule does not match rather than guessing.

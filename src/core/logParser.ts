@@ -7,11 +7,20 @@ import type { Evidence, McuInfo } from './types.js';
 //   klippy/mcu.py          "Loaded MCU '%s' %d commands (%s / %s)"
 //   klippy/extras/statistics.py  "Stats %.1f: ..."
 //   klippy/queuelogger.py  doRollover() repeats the version and config blocks at the top of a new file
+//   klippy/mcu.py, extras/error_mcu.py, extras/verify_heater.py, extras/tmc.py, extras/tmc_uart.py,
+//   extras/tmc2130.py, toolhead.py   the line starts in LOG_LINE
 
 const CONFIG_START = '===== Config file =====';
 const START_PRINTER = 'Start printer at ';
 const STARTING_KLIPPY = 'Starting Klippy...';
 const SHUTDOWN = 'Transition to shutdown state: ';
+const ROLLOVER = '=============== Log rollover';
+
+/** Evidence and rule matching never need more of a line than this. Longer lines are damage or dumps. */
+const MAX_LINE = 16 * 1024;
+
+const LOG_START = [STARTING_KLIPPY, START_PRINTER, 'Git version: ', 'Stats ', SHUTDOWN, ROLLOVER, 'Loaded MCU ', 'Timeout with MCU ', 'Lost communication with MCU ', 'Unable to read tmc ', 'Unable to write tmc ', 'Move out of range: ', 'Must home axis first: ', 'MCU error during connect', 'Unhandled exception'];
+const LOG_LINE = /^(?:(?:Previous )?MCU '[^']+' (?:is_)?shutdown: |Heater .+ not heating at expected rate|TMC '[^']+' reports error: |TMC \S+ failed to init: |mcu '[^']+': |(?:Config|Protocol) error\s*$)/;
 
 export interface StatsPoint {
   line: number;
@@ -29,7 +38,8 @@ export interface LogSession {
   monotonicStart?: number;
   klipperVersion?: string;
   mcus: McuInfo[];
-  config?: { startLine: number; lines: string[] };
+  /** cutOff: the dump has no end marker, so part of the config is missing. */
+  config?: { startLine: number; lines: string[]; cutOff?: boolean };
   statsCount: number;
   firstStats?: StatsPoint;
   lastStats?: StatsPoint;
@@ -45,38 +55,45 @@ export interface ParsedLog {
   startCount: number;
 }
 
+/**
+ * Line ends as they turn up in logs that have been through other systems: LF, CR LF, a lone CR and
+ * the CR CR LF of a double conversion. A log file is mostly LF, so that path stays a plain split.
+ */
 export function splitLines(text: string): string[] {
-  const lines = text.split('\n');
-  if (lines.length > 0 && lines[lines.length - 1] === '') lines.pop();
-  if (text.includes('\r')) {
-    for (let i = 0; i < lines.length; i++) {
-      const l = lines[i] as string;
-      if (l.charCodeAt(l.length - 1) === 13) lines[i] = l.slice(0, -1);
-    }
+  if (!text.includes('\r')) {
+    const lines = text.split('\n');
+    if (lines[lines.length - 1] === '') lines.pop();
+    return lines;
   }
+  const lines: string[] = [];
+  let start = 0;
+  for (let i = 0; i < text.length; i++) {
+    const c = text.charCodeAt(i);
+    if (c !== 10 && c !== 13) continue;
+    lines.push(text.slice(start, i));
+    if (c === 13) {
+      const j = text.charCodeAt(i + 1) === 13 ? i + 2 : i + 1;
+      if (text.charCodeAt(j) === 10) i = j;
+    }
+    start = i + 1;
+  }
+  if (start < text.length) lines.push(text.slice(start));
   return lines;
 }
 
+// Some vendor forks log with a format string that puts this in front of every message.
+const FORK_PREFIX = /^\[(?:[A-Z]+|Level None)\] \d{4}-\d\d-\d\d \d\d:\d\d:\d\d,\d+ \[[^\]]*\] \[[^\]]*\] /;
+
+/** Removes the fork's prefix, in place, so the rest of the engine sees the lines Klipper's source writes. */
+export function stripForkPrefix(lines: string[]): void {
+  if (!lines.slice(0, 400).some((l) => FORK_PREFIX.test(l))) return;
+  for (let i = 0; i < lines.length; i++) lines[i] = (lines[i] as string).replace(FORK_PREFIX, '');
+}
+
 export function looksLikeLog(lines: string[]): boolean {
-  const n = Math.min(lines.length, 400);
-  for (let i = 0; i < n; i++) {
-    const l = lines[i] as string;
-    if (
-      l.startsWith(STARTING_KLIPPY) ||
-      l.startsWith(START_PRINTER) ||
-      l === CONFIG_START ||
-      l.startsWith('Git version: ') ||
-      l.startsWith('Stats ') ||
-      l.startsWith(SHUTDOWN) ||
-      l.startsWith('=============== Log rollover')
-    ) {
-      return true;
-    }
-  }
-  // Log lines can also begin well past the first 400 lines of a pasted tail.
-  for (let i = n; i < lines.length; i++) {
-    const l = lines[i] as string;
-    if (l.startsWith('Stats ') || l.startsWith(SHUTDOWN)) return true;
+  for (const l of lines) {
+    if (l === CONFIG_START || LOG_START.some((m) => l.startsWith(m))) return true;
+    if (l.length < MAX_LINE && LOG_LINE.test(l)) return true;
   }
   return false;
 }
@@ -92,6 +109,19 @@ function newSession(index: number, startLine: number): LogSession {
     shutdowns: [],
   };
 }
+
+const evidence = (line: number, text: string): Evidence => ({
+  line,
+  text: text.length > MAX_LINE ? text.slice(0, MAX_LINE) : text,
+});
+
+const endsCutOffDump = (line: string): boolean =>
+  line === CONFIG_START ||
+  line.startsWith(START_PRINTER) ||
+  line.startsWith(STARTING_KLIPPY) ||
+  line.startsWith('Stats ') ||
+  line.startsWith(SHUTDOWN) ||
+  line.startsWith(ROLLOVER);
 
 function parseStatsTime(line: string): number | undefined {
   // "Stats 5003.2: gcodein=0 ..."
@@ -127,10 +157,15 @@ export function parseLog(lines: string[]): ParsedLog {
       // The dump ends at a line made only of "=" characters. Config text never has one.
       if (line.length >= 3 && /^=+$/.test(line)) {
         inConfig = false;
-      } else if (cur.config) {
-        cur.config.lines.push(line);
+        continue;
       }
-      continue;
+      if (!endsCutOffDump(line)) {
+        if (cur.config) cur.config.lines.push(line);
+        continue;
+      }
+      // No end marker, and Klipper's own lines have started again: two logs joined together.
+      if (cur.config) cur.config.cutOff = true;
+      inConfig = false;
     }
 
     if (line.startsWith('Stats ')) {
@@ -150,7 +185,7 @@ export function parseLog(lines: string[]): ParsedLog {
         cur = newSession(sessions.length + 1, no);
         curHasStart = false;
       }
-      cur.notable.push({ line: no, text: line });
+      cur.notable.push(evidence(no, line));
       continue;
     }
 
@@ -161,12 +196,12 @@ export function parseLog(lines: string[]): ParsedLog {
       }
       curHasStart = true;
       starts++;
-      const m = /^Start printer at (.+) \((\d+(?:\.\d+)?) (\d+(?:\.\d+)?)\)\s*$/.exec(line);
+      const m = line.length < MAX_LINE ? /^Start printer at (.+) \((\d+(?:\.\d+)?) (\d+(?:\.\d+)?)\)\s*$/.exec(line) : null;
       if (m) {
         cur.startedAt = m[1];
         cur.monotonicStart = Number(m[3]);
       }
-      cur.notable.push({ line: no, text: line });
+      cur.notable.push(evidence(no, line));
       continue;
     }
 
@@ -180,17 +215,18 @@ export function parseLog(lines: string[]): ParsedLog {
     if (line.charCodeAt(0) === 35) continue;
 
     if (line.startsWith('Git version: ')) {
-      const m = /^Git version: '([^']*)'/.exec(line);
+      const m = /^Git version: '([^']{0,200})'/.exec(line);
       if (m) cur.klipperVersion = m[1];
     } else if (line.startsWith('Loaded MCU ')) {
-      const m = /^Loaded MCU '([^']+)' \d+ commands \((\S+) \/ /.exec(line);
+      const m = /^Loaded MCU '([^']{1,200})' \d+ commands \((\S{1,200}) \/ /.exec(line);
       if (m) cur.mcus.push({ name: m[1] as string, version: m[2] });
     } else if (line.startsWith(SHUTDOWN)) {
-      cur.shutdowns.push({ line: no, text: line });
+      cur.shutdowns.push(evidence(no, line));
     }
-    cur.notable.push({ line: no, text: line });
+    cur.notable.push(evidence(no, line));
   }
 
+  if (inConfig && cur.config) cur.config.cutOff = true;
   close(lines.length);
 
   // A Klipper RESTART keeps the process, so the version block is only logged once.

@@ -1,0 +1,6 @@
+# fixture: Plain text passed by mistake
+# made by scripts/make-fixtures.mjs from message formats in the Klipper source (none, this is not a Klipper file). Not a real user's log.
+Shopping list
+nozzles, 0.4 mm
+more PLA
+the bed needs levelling again

@@ -1,4 +1,4 @@
-import { KLIPPER_DOCS, KLIPPER_SRC } from '../types.js';
+import { configNumber, KLIPPER_DOCS, KLIPPER_SRC } from '../types.js';
 // klippy/toolhead.py Move.move_error(): "%s: %.3f %.3f %.3f [%.3f]" with msg "Move out of range"
 // klippy/kinematics/cartesian.py (and corexy, corexz, polar, ...): move.move_error("Must home axis first")
 // klippy/gcode.py _respond_error(): logs the error as a warning, so it appears in klippy.log.
@@ -18,9 +18,9 @@ function axisRangeProblems(ctx, pos) {
     const out = [];
     AXES.forEach((axis, i) => {
         const sec = `stepper_${axis}`;
-        const max = Number(cfg.option(sec, 'position_max')?.value);
+        const max = configNumber(cfg.option(sec, 'position_max')?.value);
         const minOpt = cfg.option(sec, 'position_min');
-        const min = minOpt ? Number(minOpt.value) : 0;
+        const min = minOpt ? configNumber(minOpt.value) : 0;
         const v = pos[i];
         if (v === undefined || !Number.isFinite(max) || !Number.isFinite(min))
             return;
@@ -74,16 +74,17 @@ export const stepcompressInternal = {
     id: 'stepcompress-internal-error',
     severity: 'error',
     title: 'Internal error in stepcompress',
-    detail: 'Klipper\'s step queue failed a consistency check while syncing a stepper position. This is a bug-level error in the host software, not a wiring fault.',
+    detail: 'Klipper\'s step queue reported an error while generating steps or syncing a stepper position. Klipper treats this as an internal error in the host software, not as a message from the hardware.',
     fix: 'Update Klipper and restart; if it repeats, post the full klippy.log in a Klipper issue or the Klipper forum.',
     docs: KLIPPER_SRC + 'klippy/stepper.py',
     check(ctx) {
-        const hit = ctx.match(/^\S.*Internal error in stepcompress/);
+        // Before klippy/stepper.py and extras/motion_queuing.py used this wording, it named the MCU.
+        const hit = ctx.match(/^\S.*Internal error in (?:MCU '[^']+' )?stepcompress/);
         if (!hit)
             return null;
         const cmd = ctx.match(/^Internal error on command:"([^"]*)"/);
         return {
-            detail: `Klipper's step queue returned an error ("Internal error in stepcompress") while${cmd ? ` running ${cmd.m[1]}, ` : ' '}resetting or reading a stepper's position (raised in stepper.py note_homing_end and _query_mcu_position). It is an internal consistency check in the host software, not a hardware report.`,
+            detail: `Klipper's step queue returned an error ("Internal error in stepcompress")${cmd ? ` while running ${cmd.m[1]}` : ''}. It is raised while generating steps (extras/motion_queuing.py) or while resetting or reading a stepper's position (stepper.py note_homing_end and _query_mcu_position). It is an internal error in the host software, not a message from the hardware.`,
             evidence: [cmd?.ev, hit.ev, ctx.shutdown].filter((e) => !!e).filter((e, i, a) => a.findIndex((x) => x.line === e.line) === i),
         };
     },

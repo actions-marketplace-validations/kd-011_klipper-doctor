@@ -1,0 +1,124 @@
+# fixture: MCU shutdown: Timer too close
+# made by scripts/make-fixtures.mjs from message formats in the Klipper source (src/sched.c, extras/error_mcu.py). Not a real user's log.
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] Starting Klippy...
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] Args: ['/home/pi/klipper/klippy/klippy.py', '/home/pi/printer_data/config/printer.cfg', '-I', '/home/pi/printer_data/comms/klippy.serial', '-l', '/home/pi/printer_data/logs/klippy.log', '-a', '/home/pi/printer_data/comms/klippy.sock']
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] Git version: 'v0.12.0-250-g1a2b3c4d'
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] Branch: master
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] Remote: origin
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] Tracked URL: https://github.com/Klipper3d/klipper
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] CPU: 4 core ARMv7 Processor rev 4 (v7l)
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] Device: Raspberry Pi 3 Model B Rev 1.2
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] Linux: Linux version 6.1.21-v7+ (dom@buildbot) (arm-linux-gnueabihf-gcc-12 (Raspbian 12.2.0-14+rpi1) 12.2.0) #1642 SMP Mon Apr  3 17:20:52 BST 2023
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] Python: '3.9.2 (default, Feb 28 2021, 17:03:44) \n[GCC 10.2.1 20210110]'
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] Start printer at Sun Nov  1 10:00:00 2026 (1793527200.0 5000.0)
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] ===== Config file =====
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] [mcu]
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] serial = /dev/serial/by-id/usb-Klipper_stm32f103xe_ABC123-if00
+
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] [printer]
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] kinematics = cartesian
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] max_velocity = 300
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] max_accel = 3000
+
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] [stepper_x]
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] step_pin = PB13
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] dir_pin = !PB12
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] enable_pin = !PB14
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] microsteps = 16
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] rotation_distance = 40
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] endstop_pin = ^PC0
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] position_endstop = 0
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] position_max = 235
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] homing_speed = 50
+
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] [stepper_y]
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] step_pin = PB10
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] dir_pin = !PB2
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] enable_pin = !PB11
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] microsteps = 16
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] rotation_distance = 40
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] endstop_pin = ^PC1
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] position_endstop = 0
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] position_max = 235
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] homing_speed = 50
+
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] [stepper_z]
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] step_pin = PB0
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] dir_pin = PC5
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] enable_pin = !PB1
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] microsteps = 16
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] rotation_distance = 8
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] endstop_pin = ^PC2
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] position_endstop = 0.5
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] position_max = 250
+
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] [extruder]
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] step_pin = PB3
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] dir_pin = !PB4
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] enable_pin = !PD2
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] microsteps = 16
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] rotation_distance = 33.683
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] nozzle_diameter = 0.400
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] filament_diameter = 1.750
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] heater_pin = PC8
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] sensor_type = EPCOS 100K B57560G104F
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] sensor_pin = PA0
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] control = pid
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] pid_kp = 26.213
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] pid_ki = 1.304
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] pid_kd = 131.721
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] min_temp = 0
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] max_temp = 270
+
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] [heater_bed]
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] heater_pin = PC9
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] sensor_type = ATC Semitec 104GT-2
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] sensor_pin = PC4
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] control = watermark
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] min_temp = 0
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] max_temp = 130
+
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] [tmc2209 stepper_x]
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] uart_pin = PC11
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] tx_pin = PC10
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] uart_address = 0
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] run_current = 0.580
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] stealthchop_threshold = 999999
+
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] [input_shaper]
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] shaper_freq_x = 58.2
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] shaper_type_x = mzv
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] shaper_freq_y = 41.6
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] shaper_type_y = mzv
+
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] [gcode_macro START_PRINT]
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] gcode =
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] 	G28
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] 	G1 Z10 F600
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] 	M109 S{params.EXTRUDER|default(200)}
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] =======================
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] Loaded MCU 'mcu' 112 commands (v0.12.0-250-g1a2b3c4d / gcc: (15:7-2018-q2-1) 7.3.1 20180622 (release) [ARM/embedded-7-branch revision 261907] binutils: (2.31.1-0))
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] MCU 'mcu' config: ADC_MAX=4095 BUS_PINS_i2c1=PB6,PB7 CLOCK_FREQ=72000000 MCU=stm32f103xe PWM_MAX=255 SERIAL_BAUD=250000 STEPPER_BOTH_EDGE=1
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] MCU 'mcu' kconfig: {'CONFIG_MACH_STM32': 1, 'CONFIG_MCU': 'stm32f103xe'}
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] Configured MCU 'mcu' (1024 moves)
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] Stats 5010.0: gcodein=0  mcu: mcu_awake=0.001 mcu_task_avg=0.000009 mcu_task_stddev=0.000012 bytes_write=1400 bytes_read=1800 bytes_retransmit=0 bytes_invalid=0 send_seq=100 receive_seq=100 retransmit_seq=0 srtt=0.001 rttvar=0.000 rto=0.025 ready_bytes=0 upcoming_bytes=0 freq=72000123 heater_bed: target=60 temp=59.8 pwm=0.250 sysload=0.22 cputime=2.5 memavail=800000
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] Stats 5011.0: gcodein=0  mcu: mcu_awake=0.001 mcu_task_avg=0.000009 mcu_task_stddev=0.000012 bytes_write=1400 bytes_read=1800 bytes_retransmit=0 bytes_invalid=0 send_seq=100 receive_seq=100 retransmit_seq=0 srtt=0.001 rttvar=0.000 rto=0.025 ready_bytes=0 upcoming_bytes=0 freq=72000123 heater_bed: target=60 temp=59.8 pwm=0.250 sysload=0.22 cputime=2.5 memavail=800000
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] Stats 5012.0: gcodein=0  mcu: mcu_awake=0.001 mcu_task_avg=0.000009 mcu_task_stddev=0.000012 bytes_write=1400 bytes_read=1800 bytes_retransmit=0 bytes_invalid=0 send_seq=100 receive_seq=100 retransmit_seq=0 srtt=0.001 rttvar=0.000 rto=0.025 ready_bytes=0 upcoming_bytes=0 freq=72000123 heater_bed: target=60 temp=59.8 pwm=0.250 sysload=0.22 cputime=2.5 memavail=800000
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] Stats 5013.0: gcodein=0  mcu: mcu_awake=0.001 mcu_task_avg=0.000009 mcu_task_stddev=0.000012 bytes_write=1400 bytes_read=1800 bytes_retransmit=0 bytes_invalid=0 send_seq=100 receive_seq=100 retransmit_seq=0 srtt=0.001 rttvar=0.000 rto=0.025 ready_bytes=0 upcoming_bytes=0 freq=72000123 heater_bed: target=60 temp=59.8 pwm=0.250 sysload=0.22 cputime=2.5 memavail=800000
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] Transition to shutdown state: MCU shutdown
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] MCU 'mcu' shutdown: Timer too close
+
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] This often indicates the host computer is overloaded. Check
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] for other processes consuming excessive CPU time, high swap
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] usage, disk errors, overheating, unstable voltage, or
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] similar system problems on the host computer.
+
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] Once the underlying issue is corrected, use the
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] "FIRMWARE_RESTART" command to reset the firmware, reload the
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] config, and restart the host software.
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] Printer is shutdown
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] Dumping serial stats: bytes_write=2400 bytes_read=3100 bytes_retransmit=2 bytes_invalid=0 send_seq=140 receive_seq=140 retransmit_seq=1 srtt=0.002 rttvar=0.000 rto=0.025 ready_bytes=0 upcoming_bytes=0
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] Dumping send queue 3 messages
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] Send: 4 1793.5 1793.5 7: seq: 1c, queue_step oid=2 interval=4000 count=10 add=0
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] Dumping receive queue 2 messages
+[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] Receive: 0 5410.2 5410.2 5: seq: 1d, status clock=1234567 status_clock=1234500

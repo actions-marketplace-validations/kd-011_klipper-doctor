@@ -8,3 +8,7 @@ export declare function toText(report: Report, opts?: {
     color?: boolean;
     width?: number;
 }): string;
+/** One `::error file=,line=::` workflow command per finding, so GitHub Actions can annotate the file. */
+export declare function toGithub(report: Report, opts?: {
+    file?: string;
+}): string;

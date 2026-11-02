@@ -28,6 +28,8 @@ export interface ReportMeta {
     linesRead: number;
     /** 1-based number of the session that was analysed (0 for a raw printer.cfg). */
     analysedSession: number;
+    /** Config findings hidden by `ignore` or by a `# klipper-doctor: ignore` comment. Unset when none. */
+    suppressed?: number;
 }
 export interface Report {
     meta: ReportMeta;
@@ -36,6 +38,12 @@ export interface Report {
 }
 export interface AnalyzeOptions {
     filename?: string;
+    /**
+     * Config rule ids to leave out of the report. Crash rules and `unusable-input` are never hidden, and
+     * neither is a crash finding by an inline comment. Inline `# klipper-doctor: ignore <rule-id>` comments
+     * in a printer.cfg are always honoured.
+     */
+    ignore?: string[];
 }
 /** What a rule returns for one occurrence. Unset text falls back to the rule's own. */
 export interface Hit {

@@ -30,8 +30,12 @@ test('exit code 2 on a missing file, with the real error text', () => {
   assert.match(r.stderr, /ENOENT|no such file/i);
 });
 
-test('exit code 2 on no arguments and on an unknown flag', () => {
-  assert.equal(run([]).status, 2);
+test('exit code 2 on no arguments (with no default log) and on an unknown flag', () => {
+  // A printer host has ~/printer_data/logs/klippy.log, which no arguments would read, so use an empty HOME.
+  const home = mkdtempSync(join(tmpdir(), 'klipper-doctor-home-'));
+  const none = spawnSync(process.execPath, [cli], { encoding: 'utf8', env: { ...process.env, HOME: home, USERPROFILE: home } });
+  rmSync(home, { recursive: true });
+  assert.equal(none.status, 2);
   const r = run(['--frobnicate', fixturePath('clean.log')]);
   assert.equal(r.status, 2);
   assert.match(r.stderr, /--frobnicate/);

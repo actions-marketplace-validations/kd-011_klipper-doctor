@@ -39,3 +39,24 @@ jobs:
         run: git diff --exit-code dist
       - name: README rule table is up to date
         run: node scripts/gen-rules-table.mjs --check
+
+  # The composite action in this repo, called by local path: a clean config must pass,
+  # and a broken one must be annotated and fail the step.
+  action:
+    name: GitHub Action
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - name: A clean config passes
+        uses: ./
+        with:
+          files: test/fixtures/clean.cfg
+      - name: A broken config is annotated and fails
+        id: broken
+        uses: ./
+        continue-on-error: true
+        with:
+          files: test/fixtures/all-rules.cfg
+      - name: The broken config failed the step
+        run: test ${{ steps.broken.outcome == 'failure' }} = true

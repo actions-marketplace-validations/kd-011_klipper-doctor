@@ -1,5 +1,6 @@
 import { causalLines, findCause } from './cause.js';
 import { parseConfig } from './configParser.js';
+import { NEVER_SUPPRESSED, parseIgnoreList, suppress } from './suppress.js';
 import { looksLikeLog, parseLog, splitLines, stripForkPrefix } from './logParser.js';
 import type { LogSession, ParsedLog } from './logParser.js';
 import { configRules } from './rules/config/index.js';
@@ -12,7 +13,7 @@ import { KLIPPER_DOCS, KLIPPER_SRC } from './rules/types.js';
 import type { AnalyzeOptions, Evidence, Finding, Hit, Report, RuleMeta, Severity } from './types.js';
 
 export type { AnalyzeOptions, Evidence, Finding, McuInfo, Report, ReportMeta, Severity } from './types.js';
-export { toMarkdown, toText, verdict, countBySeverity } from './report.js';
+export { toMarkdown, toText, toGithub, verdict, countBySeverity } from './report.js';
 export { VERSION } from './version.js';
 
 const SEVERITY_RANK: Record<Severity, number> = { error: 0, warning: 1, note: 2 };
@@ -190,7 +191,7 @@ function unusable(kind: Report['meta']['inputKind'], linesRead: number, hit: Hit
   };
 }
 
-function analyzeText(input: string, filename: string | undefined): Report {
+function analyzeText(input: string, filename: string | undefined, ignore: Set<string>): Report {
   const { text, bom } = cleanInput(input);
   const lines = splitLines(text);
   stripForkPrefix(lines);
@@ -244,9 +245,10 @@ function analyzeText(input: string, filename: string | undefined): Report {
         evidence: [{ line: 1, text: lineText(1) }],
       }));
     }
+    const { kept, count } = suppress(findings, ignore, lines);
     return {
-      meta: { inputKind: 'printer.cfg', mcus: [], sessions: 0, linesRead: lines.length, analysedSession: 0 },
-      config: findings,
+      meta: { inputKind: 'printer.cfg', mcus: [], sessions: 0, linesRead: lines.length, analysedSession: 0, ...(count ? { suppressed: count } : {}) },
+      config: kept,
       crash: [],
     };
   }
@@ -293,6 +295,9 @@ function analyzeText(input: string, filename: string | undefined): Report {
     }
   }
 
+  // The dump in a log has had its comments removed by Klipper, so only the option list applies here.
+  const shown = suppress(config, ignore);
+
   const mcus = new Map<string, { name: string; version?: string }>();
   for (const m of session.mcus) mcus.set(m.name, m);
 
@@ -304,8 +309,9 @@ function analyzeText(input: string, filename: string | undefined): Report {
       sessions: parsed.sessions.length,
       linesRead: lines.length,
       analysedSession: session.index,
+      ...(shown.count ? { suppressed: shown.count } : {}),
     },
-    config,
+    config: shown.kept,
     crash,
   };
 }
@@ -314,7 +320,7 @@ function analyzeText(input: string, filename: string | undefined): Report {
 export function analyze(text: string, opts: AnalyzeOptions = {}): Report {
   try {
     const filename = typeof opts?.filename === 'string' ? opts.filename : undefined;
-    return analyzeText(typeof text === 'string' ? text : '', filename);
+    return analyzeText(typeof text === 'string' ? text : '', filename, parseIgnoreList(opts?.ignore));
   } catch (e) {
     return unusable('printer.cfg', 0, {
       title: 'klipper-doctor could not read this file',
@@ -327,17 +333,21 @@ export function analyze(text: string, opts: AnalyzeOptions = {}): Report {
 
 export interface RuleInfo extends RuleMeta {
   kind: 'config' | 'crash';
+  /** True for a config rule that `ignore` and `# klipper-doctor: ignore` can hide. */
+  suppressible: boolean;
 }
 
 /** Every rule klipper-doctor can fire, for the README table and for docs. */
 export function rulesMetadata(): RuleInfo[] {
   const strip = (r: RuleMeta): RuleMeta => ({ id: r.id, severity: r.severity, title: r.title, detail: r.detail, fix: r.fix, docs: r.docs });
+  const crash = (r: RuleMeta): RuleInfo => ({ kind: 'crash', suppressible: false, ...r });
+  const config = (r: RuleMeta): RuleInfo => ({ kind: 'config', suppressible: !NEVER_SUPPRESSED.has(r.id), ...r });
   return [
-    ...crashRules.map((r) => ({ kind: 'crash' as const, ...strip(r) })),
-    { kind: 'crash' as const, ...unknownReasonMeta },
-    { kind: 'crash' as const, ...noFailureMeta },
-    ...configRules.map((r) => ({ kind: 'config' as const, ...strip(r) })),
-    { kind: 'config' as const, ...noConfigDumpMeta },
-    { kind: 'config' as const, ...unusableInputMeta },
+    ...crashRules.map((r) => crash(strip(r))),
+    crash(unknownReasonMeta),
+    crash(noFailureMeta),
+    ...configRules.map((r) => config(strip(r))),
+    config(noConfigDumpMeta),
+    config(unusableInputMeta),
   ];
 }

@@ -6,6 +6,19 @@ All notable changes to this project are listed here. The format follows
 
 ## [Unreleased]
 
+### Added
+- With no file argument, `klipper-doctor` reads `~/printer_data/logs/klippy.log` if it exists and says so on stderr, and otherwise prints the usage and exits 2.
+- `klipper-doctor http://host:7125` downloads `klippy.log` through Moonraker's file API (`GET /server/files/klippy.log`), so a laptop can diagnose a printer whose host has no Node. `--api-key` sends the key from `MOONRAKER_API_KEY` (or `--api-key=VAR`) as `X-Api-Key` and never prints it. An unreachable host, authentication required, a rejected key, a redirect, a 404 and a timeout each get a plain error and exit 2. `--timeout` sets the wait.
+- `--format text|json|md|github`. `--format github` prints `::error file=,line=::` workflow commands (and `::warning`, `::notice`) so GitHub annotates the file. `--json` and `--md` work as before. The library exports `toGithub`.
+- `action.yml`: a composite GitHub Action that lints `.cfg` files with `--format github`, with `files` and `ignore` inputs. It is tested in `ci.yml` by local path.
+- `.pre-commit-hooks.yaml`: a `klipper-doctor` hook for pre-commit.
+- Suppressions: `--ignore id,id` and, in a `printer.cfg`, `# klipper-doctor: ignore <rule-id>` on the offending line or in the comment lines directly above it. Crash findings and `unusable-input` are never hidden. The library takes `ignore` in `analyze` options, reports `meta.suppressed`, and `rulesMetadata()` entries carry `suppressible`. The text and markdown reports say how many findings were hidden.
+- Several files in one run (`klipper-doctor a.cfg b.cfg`), and `--` to end the options. With several files, text and markdown get a `==> file <==` heading each and JSON is an array of `{ file, report }`. One file keeps the output it had.
+- `klipper-doctor completions bash|zsh|fish` prints a completion script. `--help` and the scripts are generated from one option table, and a test checks they agree.
+
+### Changed
+- Releases are automatic. `publish.yml` no longer waits for a tag: when a push to `main` changes `package.json` to a version npm does not have, it runs the checks, publishes with provenance, then creates the `v<version>` tag and a GitHub Release with that version's section of this file as the notes. It uses the `NPM_TOKEN` secret if there is one and npm trusted publishing (OIDC) if there is not. `scripts/release.mjs` holds the version comparison and the changelog extraction.
+
 ## [0.3.0] - 2026-11-02
 
 Messages in the new rules are from Klipper at commit 0cee841 (28 October 2026).

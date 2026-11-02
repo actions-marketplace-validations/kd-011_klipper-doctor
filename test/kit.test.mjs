@@ -106,9 +106,10 @@ test('ci: weekly schedule, and the matrix names match the ruleset', () => {
   assert.match(read('README.md'), /actions\/workflows\/ci\.yml\/badge\.svg/);
 });
 
-test('publish workflow stays manual-tag only: nothing scheduled, nothing dispatched', () => {
+test('publish workflow runs only for a push to main that changes package.json: no tag, nothing scheduled, nothing dispatched', () => {
   const y = read('.github/workflows/publish.yml').replace(/^\s*#.*$/gm, '');
-  assert.match(y, /tags: \['v\*'\]/);
+  assert.doesNotMatch(y, /tags:/);
+  assert.match(y, /branches: \[main\]\n\s+paths: \[package\.json\]/);
   assert.doesNotMatch(y, /schedule:/);
   assert.doesNotMatch(y, /workflow_dispatch/);
 });

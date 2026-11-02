@@ -1,0 +1,28 @@
+name: klipper-doctor
+description: Lint Klipper printer.cfg files and annotate the problems on the commit or pull request.
+author: kd-011
+branding:
+  icon: check-circle
+  color: orange
+inputs:
+  files:
+    description: Files to check, separated by spaces. Globs such as config/*.cfg work.
+    default: printer.cfg
+  ignore:
+    description: Config rule ids to hide, separated by commas. Crash findings are never hidden.
+    default: ''
+runs:
+  using: composite
+  steps:
+    - name: Run klipper-doctor
+      shell: bash
+      env:
+        INPUT_FILES: ${{ inputs.files }}
+        INPUT_IGNORE: ${{ inputs.ignore }}
+      run: |
+        # Runs the build committed with this action, so there is nothing to install. Needs Node 18 or newer,
+        # which GitHub-hosted runners have. The globs in the files input are expanded here on purpose.
+        args=(--format github)
+        if [ -n "$INPUT_IGNORE" ]; then args+=(--ignore "$INPUT_IGNORE"); fi
+        # shellcheck disable=SC2086
+        node "$GITHUB_ACTION_PATH/dist/cli.js" "${args[@]}" -- $INPUT_FILES

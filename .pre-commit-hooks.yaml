@@ -1,0 +1,17 @@
+# For https://pre-commit.com: lint the Klipper config files in a repo before each commit.
+#
+#   repos:
+#     - repo: https://github.com/kd-011/klipper-doctor
+#       rev: vX.Y.Z      # a release tag that has this file
+#       hooks:
+#         - id: klipper-doctor
+#
+# The hook only needs the `dist/` that is committed in this repo; pre-commit installs it with npm.
+- id: klipper-doctor
+  name: klipper-doctor
+  description: Lint Klipper printer config files (printer.cfg and the other .cfg files in a config repo)
+  entry: klipper-doctor
+  language: node
+  files: \.cfg$
+  types: [text]
+  minimum_pre_commit_version: 2.9.0

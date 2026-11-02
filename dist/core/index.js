@@ -1,12 +1,13 @@
 import { causalLines, findCause } from './cause.js';
 import { parseConfig } from './configParser.js';
+import { NEVER_SUPPRESSED, parseIgnoreList, suppress } from './suppress.js';
 import { looksLikeLog, parseLog, splitLines, stripForkPrefix } from './logParser.js';
 import { configRules } from './rules/config/index.js';
 import { crashRules } from './rules/crash/index.js';
 import { unparseableLine } from './rules/config/structure.js';
 import { failureEvidence, noFailure, noFailureMeta, unknownReason, unknownReasonMeta } from './rules/crash/fallback.js';
 import { KLIPPER_DOCS, KLIPPER_SRC } from './rules/types.js';
-export { toMarkdown, toText, verdict, countBySeverity } from './report.js';
+export { toMarkdown, toText, toGithub, verdict, countBySeverity } from './report.js';
 export { VERSION } from './version.js';
 const SEVERITY_RANK = { error: 0, warning: 1, note: 2 };
 const noConfigDumpMeta = {
@@ -166,7 +167,7 @@ function unusable(kind, linesRead, hit) {
         crash: [],
     };
 }
-function analyzeText(input, filename) {
+function analyzeText(input, filename, ignore) {
     const { text, bom } = cleanInput(input);
     const lines = splitLines(text);
     stripForkPrefix(lines);
@@ -217,9 +218,10 @@ function analyzeText(input, filename) {
                 evidence: [{ line: 1, text: lineText(1) }],
             }));
         }
+        const { kept, count } = suppress(findings, ignore, lines);
         return {
-            meta: { inputKind: 'printer.cfg', mcus: [], sessions: 0, linesRead: lines.length, analysedSession: 0 },
-            config: findings,
+            meta: { inputKind: 'printer.cfg', mcus: [], sessions: 0, linesRead: lines.length, analysedSession: 0, ...(count ? { suppressed: count } : {}) },
+            config: kept,
             crash: [],
         };
     }
@@ -267,6 +269,8 @@ function analyzeText(input, filename) {
                 crash.push(toFinding(noFailureMeta, noFailure(ctx, earlier, recognised)));
         }
     }
+    // The dump in a log has had its comments removed by Klipper, so only the option list applies here.
+    const shown = suppress(config, ignore);
     const mcus = new Map();
     for (const m of session.mcus)
         mcus.set(m.name, m);
@@ -278,8 +282,9 @@ function analyzeText(input, filename) {
             sessions: parsed.sessions.length,
             linesRead: lines.length,
             analysedSession: session.index,
+            ...(shown.count ? { suppressed: shown.count } : {}),
         },
-        config,
+        config: shown.kept,
         crash,
     };
 }
@@ -287,7 +292,7 @@ function analyzeText(input, filename) {
 export function analyze(text, opts = {}) {
     try {
         const filename = typeof opts?.filename === 'string' ? opts.filename : undefined;
-        return analyzeText(typeof text === 'string' ? text : '', filename);
+        return analyzeText(typeof text === 'string' ? text : '', filename, parseIgnoreList(opts?.ignore));
     }
     catch (e) {
         return unusable('printer.cfg', 0, {
@@ -301,12 +306,14 @@ export function analyze(text, opts = {}) {
 /** Every rule klipper-doctor can fire, for the README table and for docs. */
 export function rulesMetadata() {
     const strip = (r) => ({ id: r.id, severity: r.severity, title: r.title, detail: r.detail, fix: r.fix, docs: r.docs });
+    const crash = (r) => ({ kind: 'crash', suppressible: false, ...r });
+    const config = (r) => ({ kind: 'config', suppressible: !NEVER_SUPPRESSED.has(r.id), ...r });
     return [
-        ...crashRules.map((r) => ({ kind: 'crash', ...strip(r) })),
-        { kind: 'crash', ...unknownReasonMeta },
-        { kind: 'crash', ...noFailureMeta },
-        ...configRules.map((r) => ({ kind: 'config', ...strip(r) })),
-        { kind: 'config', ...noConfigDumpMeta },
-        { kind: 'config', ...unusableInputMeta },
+        ...crashRules.map((r) => crash(strip(r))),
+        crash(unknownReasonMeta),
+        crash(noFailureMeta),
+        ...configRules.map((r) => config(strip(r))),
+        config(noConfigDumpMeta),
+        config(unusableInputMeta),
     ];
 }

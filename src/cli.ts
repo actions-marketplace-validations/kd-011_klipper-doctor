@@ -1,81 +1,288 @@
 #!/usr/bin/env node
-import { readFileSync } from 'node:fs';
-import { analyze, toMarkdown, toText, VERSION } from './core/index.js';
+import { existsSync, readFileSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
+import { analyze, rulesMetadata, toGithub, toMarkdown, toText, VERSION } from './core/index.js';
 import type { Report } from './core/index.js';
+import { completionScript } from './completions.js';
+import { DEFAULT_KEY_VAR, FORMATS, SHELLS, USAGE, helpText } from './options.js';
 
-const HELP = `klipper-doctor ${VERSION}
-Explain why a Klipper print died and lint the printer config.
+type Format = (typeof FORMATS)[number];
 
-Usage:
-  klipper-doctor [options] <file>
-  klipper-doctor [options] -        read from stdin
-
-<file> is a klippy.log or a printer.cfg.
-
-Options:
-  --json         print the report as JSON
-  --md           print a paste-ready markdown summary
-  --config-only  skip the crash report
-  --color        force colour even when piped
-  --no-color     no colour in the text output
-  -h, --help     show this help
-  -v, --version  show the version
-
-Exit codes: 0 no errors, 1 at least one error finding, 2 usage or read error.
-Runs on your machine. Nothing is uploaded.`;
+const DEFAULT_TIMEOUT_SECONDS = 30;
+const MOONRAKER_LOG_PATH = '/server/files/klippy.log';
+const isUrl = (s: string) => /^https?:\/\//i.test(s);
 
 function fail(message: string): never {
   process.stderr.write(`klipper-doctor: ${message}\n`);
   process.exit(2);
 }
 
-function main(argv: string[]): number {
-  let json = false;
-  let md = false;
-  let configOnly = false;
-  let color = !!process.stdout.isTTY && !process.env['NO_COLOR'];
-  let file: string | undefined;
+interface Options {
+  format?: Format;
+  configOnly: boolean;
+  color: boolean;
+  ignore: string[];
+  /** Name of the environment variable that holds the Moonraker API key. Set only when --api-key was given. */
+  keyVar?: string;
+  timeoutSeconds: number;
+  inputs: string[];
+}
 
-  for (const arg of argv) {
-    if (arg === '-h' || arg === '--help') {
-      process.stdout.write(HELP + '\n');
+function parseArgs(argv: string[]): Options | number {
+  const o: Options = {
+    configOnly: false,
+    color: !!process.stdout.isTTY && !process.env['NO_COLOR'],
+    ignore: [],
+    timeoutSeconds: DEFAULT_TIMEOUT_SECONDS,
+    inputs: [],
+  };
+  const setFormat = (f: Format) => {
+    if (o.format !== undefined && o.format !== f) fail(`--${o.format} and --${f} cannot be combined; pick one output format`);
+    o.format = f;
+  };
+
+  let optionsEnded = false;
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i] as string;
+    // "--flag=value", or "--flag value" for the options that take one.
+    const eq = !optionsEnded && arg.startsWith('--') ? arg.indexOf('=') : -1;
+    const flag = eq > 0 ? arg.slice(0, eq) : arg;
+    const inline = eq > 0 ? arg.slice(eq + 1) : undefined;
+    const value = (): string => {
+      if (inline !== undefined) return inline;
+      const next = argv[++i];
+      if (next === undefined) fail(`${flag} needs a value. Try --help.`);
+      return next;
+    };
+
+    if (optionsEnded || arg === '-' || !arg.startsWith('-')) {
+      o.inputs.push(arg);
+    } else if (arg === '--') {
+      optionsEnded = true;
+    } else if (flag === '-h' || flag === '--help') {
+      process.stdout.write(helpText(VERSION) + '\n');
       return 0;
-    }
-    if (arg === '-v' || arg === '--version') {
+    } else if (flag === '-v' || flag === '--version') {
       process.stdout.write(VERSION + '\n');
       return 0;
-    }
-    if (arg === '--json') json = true;
-    else if (arg === '--md') md = true;
-    else if (arg === '--config-only') configOnly = true;
-    else if (arg === '--color') color = true;
-    else if (arg === '--no-color') color = false;
-    else if (arg === '-') file = '-';
-    else if (arg.startsWith('-')) fail(`unknown option ${arg}. Try --help.`);
-    else if (file !== undefined) fail(`only one file at a time, got ${file} and ${arg}`);
-    else file = arg;
+    } else if (flag === '--json') setFormat('json');
+    else if (flag === '--md') setFormat('md');
+    else if (flag === '--format') {
+      const f = value();
+      if (!(FORMATS as readonly string[]).includes(f)) fail(`unknown format ${f}. Use one of: ${FORMATS.join(', ')}.`);
+      setFormat(f as Format);
+    } else if (flag === '--config-only') o.configOnly = true;
+    else if (flag === '--color') o.color = true;
+    else if (flag === '--no-color') o.color = false;
+    else if (flag === '--ignore') {
+      for (const id of value().split(',')) if (id.trim()) o.ignore.push(id.trim());
+    } else if (flag === '--api-key') o.keyVar = inline === undefined ? DEFAULT_KEY_VAR : inline;
+    else if (flag === '--timeout') {
+      const seconds = Number(value());
+      if (!(seconds > 0)) fail('--timeout takes a number of seconds, such as 10');
+      o.timeoutSeconds = seconds;
+    } else fail(`unknown option ${arg}. Try --help.`);
   }
-  if (json && md) fail('--json and --md cannot be combined');
-  if (file === undefined) fail('no file given. Usage: klipper-doctor <klippy.log|printer.cfg|->');
+  return o;
+}
 
-  let text: string;
+/** --ignore only hides config rules the engine allows to be hidden. A typo must not silently hide nothing. */
+function checkIgnore(ids: string[]): void {
+  const rules = new Map(rulesMetadata().map((r) => [r.id, r]));
+  for (const id of ids) {
+    const rule = rules.get(id);
+    if (!rule) fail(`--ignore: unknown rule id ${id}. Config rule ids are listed in the README.`);
+    if (!rule.suppressible) fail(`--ignore: ${id} cannot be ignored. Crash findings, and unusable-input, are never hidden.`);
+  }
+}
+
+function readApiKey(varName: string): string {
+  const key = process.env[varName];
+  if (key) return key;
+  // A person who types the key itself after --api-key= must not see it printed back.
+  if (!/^[A-Z][A-Z0-9_]*$/.test(varName)) {
+    fail('--api-key=NAME takes the name of an environment variable, not the key itself. Put the key in a variable, such as MOONRAKER_API_KEY.');
+  }
+  fail(`--api-key needs the environment variable ${varName} to hold the Moonraker API key, and it is not set.`);
+}
+
+const CAUSES: Record<string, string> = {
+  ECONNREFUSED: 'connection refused: is Moonraker running, and is that the right port? Moonraker listens on 7125 unless it was changed',
+  ENOTFOUND: 'the host name was not found',
+  EAI_AGAIN: 'the host name could not be looked up',
+  EHOSTUNREACH: 'no route to the host',
+  ENETUNREACH: 'no route to the network',
+  ETIMEDOUT: 'the connection timed out',
+  ECONNRESET: 'the connection was reset',
+  CERT_HAS_EXPIRED: 'the TLS certificate has expired',
+  DEPTH_ZERO_SELF_SIGNED_CERT: 'the TLS certificate is self-signed',
+  SELF_SIGNED_CERT_IN_CHAIN: 'the TLS certificate is self-signed',
+};
+
+function describeNetworkError(e: unknown, seconds: number): string {
+  if (e instanceof Error && (e.name === 'TimeoutError' || e.name === 'AbortError')) {
+    return `it did not answer within ${seconds} seconds (change this with --timeout)`;
+  }
+  const cause = e instanceof Error ? (e.cause as { code?: string; message?: string } | undefined) : undefined;
+  const code = cause?.code;
+  return (code && CAUSES[code]) || cause?.message || (e instanceof Error ? e.message : String(e));
+}
+
+/** Moonraker's file API: GET /server/files/klippy.log (docs: external_api/file_manager, "Download klippy.log"). */
+async function fetchKlippyLog(arg: string, apiKey: string | undefined, seconds: number): Promise<string> {
+  let url: URL;
   try {
-    text = readFileSync(file === '-' ? 0 : file, 'utf8');
+    url = new URL(arg);
+  } catch {
+    fail('that is not a valid URL. Use something like http://voron.local:7125');
+  }
+  if (url.username || url.password) {
+    fail('a user name or password in the URL is not used. Put the Moonraker API key in MOONRAKER_API_KEY and run with --api-key.');
+  }
+  const prefix = url.pathname.replace(/\/+$/, '');
+  const shown = url.origin + prefix;
+  const target = url.origin + prefix + MOONRAKER_LOG_PATH;
+  const headers: Record<string, string> = apiKey ? { 'X-Api-Key': apiKey } : {};
+
+  let status: number;
+  let statusText = '';
+  let location: string | null = null;
+  let body = '';
+  try {
+    // A redirect is not followed: a custom header such as X-Api-Key would go to wherever it points.
+    const res = await fetch(target, { headers, redirect: 'manual', signal: AbortSignal.timeout(seconds * 1000) });
+    status = res.type === 'opaqueredirect' ? 302 : res.status;
+    statusText = res.statusText;
+    location = res.headers.get('location');
+    if (res.ok) body = await res.text();
+  } catch (e) {
+    fail(`could not reach ${shown}: ${describeNetworkError(e, seconds)}.`);
+  }
+
+  if (status >= 200 && status < 300) return body;
+  if (status >= 300 && status < 400) {
+    let to = '';
+    try {
+      const next = new URL(location ?? '', target);
+      to = ` to ${next.origin}${next.pathname.replace(/[^\x20-\x7e]/g, '')}`;
+    } catch {
+      // No usable Location header.
+    }
+    fail(`${shown} redirected the request${to}. klipper-doctor does not follow redirects, so the API key never goes to another address. Use the address it redirects to.`);
+  }
+  if (status === 401 || status === 403) {
+    if (apiKey) fail(`${shown} rejected the API key (HTTP ${status}). Check that the key in your environment variable is the current one for this printer.`);
+    fail(
+      `${shown} needs authentication (HTTP ${status}). Give it an API key: put the key in ${DEFAULT_KEY_VAR} and run with --api-key. ` +
+        'Or add this computer to trusted_clients in the [authorization] section of moonraker.conf.',
+    );
+  }
+  if (status === 404) {
+    fail(`${shown} answered 404 for ${MOONRAKER_LOG_PATH}, so it has no klippy.log to give. Check that the address is Moonraker itself (port 7125 unless changed), not a web page in front of it that does not pass /server through.`);
+  }
+  fail(`${shown} answered HTTP ${status}${statusText ? ' ' + statusText : ''} for ${MOONRAKER_LOG_PATH}.`);
+}
+
+interface Source {
+  /** For headings and for the file= of an annotation. Unset for stdin and a URL. */
+  file?: string;
+  label: string;
+  text: string;
+  /** The name analyze() uses to tell a log from a config. */
+  filename?: string;
+}
+
+function readFile(file: string): Source {
+  try {
+    return { file, label: file, text: readFileSync(file === '-' ? 0 : file, 'utf8'), filename: file };
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     // Common under WSL and over ssh: a path copied from Windows Explorer.
     const windows = process.platform !== 'win32' && /^(?:[A-Za-z]:[\\/]|\\\\)/.test(file);
-    fail(windows ? `${message}\nThat looks like a Windows path. Under WSL the C: drive is /mnt/c, and a host reached over ssh has its own paths.` : message);
+    // "voron.local:7125" is read as a file name.
+    const host = /^[A-Za-z0-9.-]+:\d{2,5}$/.test(file);
+    fail(
+      windows
+        ? `${message}\nThat looks like a Windows path. Under WSL the C: drive is /mnt/c, and a host reached over ssh has its own paths.`
+        : host
+          ? `${message}\nIf that is a Moonraker address, give the whole URL: http://${file}`
+          : message,
+    );
+  }
+}
+
+async function load(inputs: string[], keyVar: string | undefined, seconds: number): Promise<Source[]> {
+  const apiKey = keyVar !== undefined ? readApiKey(keyVar) : undefined;
+  const sources: Source[] = [];
+  for (const input of inputs) {
+    if (isUrl(input)) {
+      sources.push({ label: input, text: await fetchKlippyLog(input, apiKey, seconds), filename: 'klippy.log' });
+    } else if (input === '-') {
+      sources.push({ label: '<stdin>', text: readFileSync(0, 'utf8') });
+    } else {
+      sources.push(readFile(input));
+    }
+  }
+  return sources;
+}
+
+function usageFail(message: string): never {
+  process.stderr.write(`klipper-doctor: ${message}\n\n${USAGE}\n`);
+  process.exit(2);
+}
+
+async function main(argv: string[]): Promise<number> {
+  if (argv[0] === 'completions') {
+    const shell = argv[1];
+    if (!(SHELLS as readonly string[]).includes(shell ?? '')) fail(`completions needs a shell: ${SHELLS.join(', ')}.`);
+    process.stdout.write(completionScript(shell as (typeof SHELLS)[number]));
+    return 0;
   }
 
-  const report: Report = analyze(text, { filename: file === '-' ? undefined : file });
-  if (configOnly) report.crash = [];
+  const parsed = parseArgs(argv);
+  if (typeof parsed === 'number') return parsed;
+  const o = parsed;
+  checkIgnore(o.ignore);
+  if (o.keyVar !== undefined && !o.inputs.some(isUrl)) fail('--api-key is for a Moonraker URL, and none was given.');
+  if (o.inputs.filter((i) => i === '-').length > 1) fail('stdin (-) can be read once.');
 
-  if (json) process.stdout.write(JSON.stringify(report, null, 2) + '\n');
-  else if (md) process.stdout.write(toMarkdown(report) + '\n');
-  else process.stdout.write(toText(report, { color }) + '\n');
+  if (o.inputs.length === 0) {
+    const fallback = join(homedir(), 'printer_data', 'logs', 'klippy.log');
+    if (!existsSync(fallback)) {
+      usageFail(`no file given, and ${fallback} does not exist.`);
+    }
+    process.stderr.write(`klipper-doctor: no file given, using ${fallback}\n`);
+    o.inputs.push(fallback);
+  }
 
-  return [...report.crash, ...report.config].some((f) => f.severity === 'error') ? 1 : 0;
+  const sources = await load(o.inputs, o.keyVar, o.timeoutSeconds);
+  const format: Format = o.format ?? 'text';
+  const results = sources.map((s) => {
+    const report: Report = analyze(s.text, { filename: s.filename, ignore: o.ignore });
+    if (o.configOnly) report.crash = [];
+    return { source: s, report };
+  });
+
+  const render = ({ source, report }: (typeof results)[number]): string =>
+    format === 'json' ? JSON.stringify(report, null, 2)
+    : format === 'md' ? toMarkdown(report)
+    : format === 'github' ? toGithub(report, { file: source.file === '-' ? undefined : source.file })
+    : toText(report, { color: o.color });
+
+  let out: string;
+  if (results.length === 1) {
+    out = render(results[0] as (typeof results)[number]);
+  } else if (format === 'json') {
+    out = JSON.stringify(results.map((r) => ({ file: r.source.label, report: r.report })), null, 2);
+  } else if (format === 'github') {
+    out = results.map(render).filter(Boolean).join('\n');
+  } else {
+    out = results.map((r) => `==> ${r.source.label} <==\n${render(r)}`).join('\n\n');
+  }
+  if (out) process.stdout.write(out + '\n');
+
+  return results.some((r) => [...r.report.crash, ...r.report.config].some((f) => f.severity === 'error')) ? 1 : 0;
 }
 
 // "klipper-doctor x | head" closes the pipe early, which is not an error worth reporting.
@@ -84,4 +291,9 @@ process.stdout.on('error', (e: NodeJS.ErrnoException) => {
   process.exit(process.exitCode ?? 0);
 });
 
-process.exitCode = main(process.argv.slice(2));
+main(process.argv.slice(2)).then(
+  (code) => {
+    process.exitCode = code;
+  },
+  (e: unknown) => fail(e instanceof Error ? e.message : String(e)),
+);

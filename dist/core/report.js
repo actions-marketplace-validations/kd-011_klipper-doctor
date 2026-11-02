@@ -32,6 +32,8 @@ export function verdict(report) {
     const s = sessionBit(report);
     if (s)
         ctx.push(s);
+    if (report.meta.suppressed)
+        ctx.push(`${report.meta.suppressed} suppressed`);
     return bits.join(', ') + (ctx.length ? ` (${ctx.join(', ')})` : '');
 }
 function firstSentence(s) {
@@ -122,5 +124,26 @@ export function toText(report, opts = {}) {
     if (report.config.length === 0 && m.inputKind === 'printer.cfg')
         out.push('CONFIG', '  no findings', '');
     out.push(paint('bold', 'Result: ') + verdict(report));
+    return out.join('\n');
+}
+// Workflow commands: https://docs.github.com/en/actions/reference/workflow-commands-for-github-actions
+// Data escapes %, CR and LF. A property also escapes ":" and ",", which would end it.
+const escapeData = (s) => s.replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
+const escapeProperty = (s) => escapeData(s).replace(/:/g, '%3A').replace(/,/g, '%2C');
+const GITHUB_LEVEL = { error: 'error', warning: 'warning', note: 'notice' };
+/** One `::error file=,line=::` workflow command per finding, so GitHub Actions can annotate the file. */
+export function toGithub(report, opts = {}) {
+    const out = [];
+    for (const f of [...report.crash, ...report.config]) {
+        const props = [];
+        if (opts.file)
+            props.push(`file=${escapeProperty(opts.file)}`);
+        const line = f.evidence[0]?.line;
+        if (line !== undefined)
+            props.push(`line=${line}`);
+        props.push(`title=${escapeProperty(`${f.title} [${f.id}]`)}`);
+        const message = f.fix ? `${f.detail}\nFix: ${f.fix}` : f.detail;
+        out.push(`::${GITHUB_LEVEL[f.severity]} ${props.join(',')}::${escapeData(message)}`);
+    }
     return out.join('\n');
 }

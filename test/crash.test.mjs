@@ -11,6 +11,7 @@ const EXPECTED = {
   'connect-failed.log': ['mcu-connect-failed'],
   'adc-out-of-range.log': ['mcu-adc-out-of-range'],
   'heater-not-heating.log': ['heater-verify'],
+  'demo.log': ['heater-verify'],
   'tmc-uart.log': ['tmc-comm'],
   'tmc-spi.log': ['tmc-comm'],
   'tmc-error.log': ['tmc-reports-error'],

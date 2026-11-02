@@ -1,0 +1,44 @@
+name: Bug, wrong diagnosis
+description: klipper-doctor blamed the wrong thing, missed the real cause, or flagged something that is fine.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. Please redact first: remove anything private from the log snippet (hostnames, usernames, serial numbers, IP addresses, Wi-Fi details). A short snippet is better than the whole log.
+  - type: input
+    id: klipper
+    attributes:
+      label: Klipper version
+      description: The `Git version:` line near the top of klippy.log, for example v0.12.0-250-g1a2b3c4d.
+    validations:
+      required: true
+  - type: input
+    id: tool
+    attributes:
+      label: klipper-doctor version
+      description: Output of `klipper-doctor --version`, or "web page".
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: What klipper-doctor said
+      description: Paste the finding, or the output of `klipper-doctor --md klippy.log`.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you think the cause actually was
+    validations:
+      required: true
+  - type: textarea
+    id: log
+    attributes:
+      label: Redacted log snippet
+      description: About 20 lines around the shutdown or the config lines involved.
+      render: text
+    validations:
+      required: true

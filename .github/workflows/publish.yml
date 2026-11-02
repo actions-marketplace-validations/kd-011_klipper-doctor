@@ -1,0 +1,38 @@
+# Publishes to npm, with provenance, when a version tag is pushed:
+#   npm version patch   (or minor), then: git push --follow-tags
+# The `version` script in package.json writes the new number into
+# src/core/version.ts and rebuilds dist, so `npm version` commits them with the tag.
+#
+# Needs one repository secret, NPM_TOKEN: an npm automation or granular access
+# token with publish rights on `klipper-doctor`
+# (GitHub: Settings > Secrets and variables > Actions > New repository secret).
+# Provenance needs no extra secret: it uses the workflow's OIDC token, which is
+# what `id-token: write` below is for. The repository must stay public.
+name: publish
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: read
+  id-token: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+      - run: npm ci
+      - name: tag matches package.json
+        run: |
+          v="$(node -p "require('./package.json').version")"
+          [ "${GITHUB_REF_NAME}" = "v${v}" ] || { echo "tag ${GITHUB_REF_NAME} does not match package.json version ${v}"; exit 1; }
+      - run: npm run check
+      - run: npm test
+      - run: node scripts/gen-rules-table.mjs --check
+      - run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

@@ -1,0 +1,33 @@
+name: New rule request
+description: A Klipper error or config mistake that klipper-doctor should recognise.
+labels: [rule]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Every rule has to trace to the Klipper docs or source. No source, no rule, so a link is the one required thing here.
+  - type: textarea
+    id: what
+    attributes:
+      label: What should it catch?
+      description: The log message or config mistake, in a sentence.
+    validations:
+      required: true
+  - type: input
+    id: source
+    attributes:
+      label: Link to the Klipper docs page or source file
+      description: For a log message, the line in the Klipper source that prints it is ideal.
+    validations:
+      required: true
+  - type: textarea
+    id: example
+    attributes:
+      label: Example (redacted)
+      description: The exact log line or config lines. Remove anything private.
+      render: text
+  - type: textarea
+    id: fix
+    attributes:
+      label: What the fix is
+      description: What the docs say to do about it.

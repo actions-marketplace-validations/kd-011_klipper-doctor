@@ -361,6 +361,14 @@ add('config-findings.log', 'A clean session whose dumped config has removed opti
       .replace('stealthchop_threshold = 999999', 'stealthchop_threshold = 500'),
   }));
 
+add('demo.log', 'A heater verify shutdown, with a mixed stealthchop threshold and no input_shaper in the dumped config (the README demo image)', 'extras/verify_heater.py, TMC_Drivers.md, Resonance_Compensation.md',
+  session(goodRun(5010, 3) + `\nHeater extruder not heating at expected rate
+${hostShutdown('Heater extruder not heating at expected rate\nSee the \'verify_heater\' section in docs/Config_Reference.md\nfor the parameters that control this check.')}`, {
+    cfg: CONFIG_DUMP
+      .replace(/\[input_shaper\][\s\S]*?\n\n/, '')
+      .replace('stealthchop_threshold = 999999', 'stealthchop_threshold = 500'),
+  }));
+
 for (const [name, text] of Object.entries(files)) writeFileSync(join(out, name), text);
 
 // CRLF copy of the clean log (Windows editors, some download paths).

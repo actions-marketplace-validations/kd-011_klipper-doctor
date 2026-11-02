@@ -114,8 +114,6 @@ Exit code is 1 when any finding is an error, 0 otherwise, and 2 for a usage or r
 
 Klipper writes the parsed config into `klippy.log` at the start of every run, so one log gives you both reports. When the log holds several Klipper starts, the last one is analysed and the count is reported. If the last one is clean, the report names the latest earlier session that failed, since Klipper has often been restarted before the log was grabbed.
 
-> **Not on npm yet.** Everything from here to "As a library" is in the repository and ships with the next release. The version of `npx klipper-doctor` on npm today does not have the default log path, the Moonraker URL, several files in one run (`klipper-doctor a.cfg b.cfg`), `--format github`, the Action, the pre-commit hook, `--ignore` or shell completions.
-
 ### Several files
 
 ```sh

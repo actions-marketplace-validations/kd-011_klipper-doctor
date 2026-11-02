@@ -6,6 +6,8 @@ All notable changes to this project are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-02
+
 ### Added
 - With no file argument, `klipper-doctor` reads `~/printer_data/logs/klippy.log` if it exists and says so on stderr, and otherwise prints the usage and exits 2.
 - `klipper-doctor http://host:7125` downloads `klippy.log` through Moonraker's file API (`GET /server/files/klippy.log`), so a laptop can diagnose a printer whose host has no Node. `--api-key` sends the key from `MOONRAKER_API_KEY` (or `--api-key=VAR`) as `X-Api-Key` and never prints it. An unreachable host, authentication required, a rejected key, a redirect, a 404 and a timeout each get a plain error and exit 2. `--timeout` sets the wait.
@@ -66,6 +68,7 @@ First release.
 - Library export: `analyze`, `toMarkdown`, `toText` and `rulesMetadata`. ESM, zero runtime dependencies, runs in Node and in the browser.
 - Every rule cites the Klipper docs or source it comes from, and the README rule table is generated from the rules' own metadata.
 
+[0.4.0]: https://github.com/kd-011/klipper-doctor/releases/tag/v0.4.0
 [0.3.0]: https://github.com/kd-011/klipper-doctor/releases/tag/v0.3.0
 [0.2.0]: https://github.com/kd-011/klipper-doctor/releases/tag/v0.2.0
 [0.1.0]: https://github.com/kd-011/klipper-doctor/releases/tag/v0.1.0

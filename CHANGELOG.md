@@ -6,6 +6,15 @@ All notable changes to this project are listed here. The format follows
 
 ## [Unreleased]
 
+Messages in the new rules are from Klipper at commit 0cee841 (28 October 2026).
+
+### Added
+- Crash rules for command errors that stop a print while Klipper keeps running, reported as warnings: `homing-no-trigger` ("No trigger on ... after full movement"), `homing-still-triggered` ("Endstop ... still triggered after retract"), `probe-triggered-early` ("Probe triggered prior to movement"), `homing-comm-timeout` ("Communication timeout during homing"), `bltouch-verify` ("BLTouch failed to verify sensor state" and "BLTouch failed to raise probe"), `extrude-cold` ("Extrude below minimum temp"), `extrude-only-too-long` and `extrude-cross-section`.
+- Crash rules for MCU shutdown reasons that used to land in `crash-unknown-reason`: `mcu-max-duration` (a digital out or PWM output left on without an update from the host) and `mcu-linux-bus-open` ("Unable to open spi device" and "Unable to open i2c device" on the Linux host MCU). Also `can-uuid-invalid` ("Invalid CAN uuid").
+- `mcu-connect-failed` tells apart a CAN board that answered with a different `canbus_uuid` ("Failed to match canbus_uuid") from a CAN interface that cannot be opened.
+- `config-error` explains seven more startup errors from Klipper's source: a pin used more than once, an unknown pin chip name, an invalid pin description, a value that is not a valid choice, a kinematics that failed to load, a TMC driver whose stepper section is missing, and an unknown temperature sensor.
+- Config rules for what Klipper rejects at startup: `pin-used-twice` (step, dir, heater and fan pins, honouring `[duplicate_pin_override]`), `tmc-microsteps` (a stepper with a TMC driver and a microsteps value the driver code does not accept), `tmc-stepper-missing` and `kinematics-missing-section` (a `cartesian`, `corexy`, `delta`, `polar` or similar printer without the stepper sections that kinematics reads).
+
 ## [0.2.0] - 2026-11-02
 
 ### Fixed

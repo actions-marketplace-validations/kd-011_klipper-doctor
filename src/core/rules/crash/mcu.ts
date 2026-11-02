@@ -116,16 +116,21 @@ export const connectFailed: CrashRule = {
     const open = opens[opens.length - 1];
     const missing = !!open && /No such file or directory/.test(open.text);
     const can = !!ctx.find(/Starting CAN connect|Unable to open CAN port: /);
+    // serialhdl.py connect_canbus() logs this at info level each time the board's uuid is not the configured one.
+    const mismatch = ctx.find(/Failed to match canbus_uuid/);
     let detail = `Klipper could not connect to MCU '${name}' within 90 seconds ("Unable to connect").`;
     let fix = 'Check the board is powered and plugged in, that the serial path in [mcu] matches `ls /dev/serial/by-id/*`, and that the board has Klipper firmware.';
     if (open) detail += ` The last port error was: ${open.text.replace(/^mcu '[^']*': /, '').replace(/[.]?$/, '.')}`;
-    if (can) {
+    if (mismatch) {
+      detail += ' Something answered on the CAN bus, but the uuid it reported does not match the canbus_uuid in the [mcu] section ("Failed to match canbus_uuid"), and Klipper kept retrying until the 90 seconds were up.';
+      fix = 'Run canbus_query.py on the host (see the CANBUS docs) to read the uuid the board reports, and put that in canbus_uuid. The tool lists only boards that are not configured yet, so a board Klipper already holds will not show up there.';
+    } else if (can) {
       fix = 'Check that the CAN interface is up, the board is powered and on the bus, and that canbus_uuid in the [mcu] section matches the board (see the CANBUS docs).';
     } else if (missing) {
       detail += ` That path does not exist, so the board is not showing up under that name.`;
       fix = 'Run `ls /dev/serial/by-id/*` on the host and copy the name it prints into serial: under [mcu]. If nothing is listed, check the USB cable and board power.';
     }
-    return { detail, fix, evidence: uniq([open, hit.ev]) };
+    return { detail, fix, evidence: uniq([mismatch, open, hit.ev]) };
   },
 };
 
@@ -278,5 +283,82 @@ export const protocolMismatch: CrashRule = {
       if (stale.length) detail += ` MCU(s) reporting a different version: ${stale.map((m) => `${m.name} (${m.version})`).join(', ')}.`;
     }
     return { detail, evidence: uniq([hit.ev, host?.ev, head]) };
+  },
+};
+
+// Shutdown reasons that error_mcu.py has no hint for.
+//   src/gpiocmds.c   shutdown("Scheduled digital out event will exceed max_duration")
+//   src/pwmcmds.c    shutdown("Scheduled pwm event will exceed max_duration")
+// docs/MCU_Commands.md (config_digital_out) describes max_duration as a safety check: the host may leave a pin at
+// a non-default value only for that long without another update, "to ensure the host does not enable the heater
+// and then go off-line". docs/Config_Reference.md ([output_pin] maximum_mcu_duration) says the MCU shuts down if
+// the host can not keep up with an update.
+export const maxDuration: CrashRule = {
+  id: 'mcu-max-duration',
+  severity: 'error',
+  title: 'Output left on too long without an update',
+  detail:
+    'The micro-controller shut down because an output pin stayed at a non-default value longer than its max_duration without the host sending another update.',
+  fix: 'Treat it as the host not keeping up: look just before the shutdown for host load, "Timeout with MCU" or lost-communication lines, and work through the Lost communication checklist. Then run FIRMWARE_RESTART.',
+  docs: KLIPPER_DOCS + 'MCU_Commands.html#common-micro-controller-objects',
+  check(ctx) {
+    const c = mcuCause(ctx, 'Scheduled digital out event will exceed max_duration', 'Scheduled pwm event will exceed max_duration');
+    if (!c) return null;
+    const kind = c.reason.includes('pwm') ? 'PWM' : 'digital';
+    return {
+      ...aboutCause(
+        c,
+        `MCU '${c.mcu}' shut down with "${c.reason}". A ${kind} output pin was left at a non-default value for longer than its max_duration without a fresh update from the host. Klipper uses that limit as a safety check so the host cannot switch on a heater and then go off-line, and the Config Reference says the MCU shuts down if the host can not keep up with an update. Klipper has no hint of its own for this reason, so the message does not say which pin it was.`,
+        'Treat it as the host not keeping up: look just before the shutdown for host load, "Timeout with MCU" or lost-communication lines, and work through the Lost communication checklist. Then run FIRMWARE_RESTART.',
+      ),
+      evidence: uniq([c.ev, ctx.shutdown]),
+    };
+  },
+};
+
+// src/linux/spidev.c spi_open(): open("/dev/spidevB.D") failing is shutdown("Unable to open spi device").
+// src/linux/i2c.c i2c_open(): shutdown("Unable to open i2c device"). Both belong to the Linux host MCU
+// (docs/RPi_microcontroller.md), which says to enable each bus with raspi-config.
+export const linuxBusOpen: CrashRule = {
+  id: 'mcu-linux-bus-open',
+  severity: 'error',
+  title: 'Linux host MCU could not open an SPI or I2C device',
+  detail:
+    'The Linux host micro-controller shut down because it could not open the SPI or I2C device a config section asked for.',
+  fix: 'Enable the bus on the host with sudo raspi-config (Interfacing options), reboot, and check the spi_bus or i2c_bus in the config names a device that exists.',
+  docs: KLIPPER_DOCS + 'RPi_microcontroller.html#optional-enabling-spi',
+  check(ctx) {
+    const c = mcuCause(ctx, 'Unable to open spi device', 'Unable to open i2c device');
+    if (!c) return null;
+    const spi = c.reason.includes('spi');
+    const bus = spi ? 'SPI' : 'I2C';
+    return {
+      ...aboutCause(
+        c,
+        `MCU '${c.mcu}' shut down with "${c.reason}". That is the Linux host micro-controller failing to open a ${bus} device (/dev/spidev for SPI, an I2C bus device for I2C) that a section in the config uses. The Klipper docs for the Linux host MCU say the ${bus} driver has to be enabled on the host first, with sudo raspi-config.`,
+        `Enable ${bus} on the host with sudo raspi-config (Interfacing options) and reboot. Then check that the ${spi ? 'spi_bus' : 'i2c_bus'} in the config names a device that exists, and run FIRMWARE_RESTART.`,
+      ),
+      evidence: uniq([c.ev, ctx.shutdown]),
+    };
+  },
+};
+
+// klippy/serialhdl.py connect_canbus(): int(canbus_uuid, 16) failing, or a value over 12 hex digits, is
+// self._error("Invalid CAN uuid"), which klippy.py reports as "MCU error during connect".
+export const canUuidInvalid: CrashRule = {
+  id: 'can-uuid-invalid',
+  severity: 'error',
+  title: 'canbus_uuid is not a valid uuid',
+  detail:
+    'Klipper could not read the canbus_uuid in the [mcu] section as a hexadecimal number of at most 12 digits.',
+  fix: 'Run canbus_query.py on the host to read the board\'s uuid, and copy it exactly into canbus_uuid in the [mcu] section.',
+  docs: KLIPPER_DOCS + 'CANBUS.html#finding-the-canbus_uuid-for-new-micro-controllers',
+  check(ctx) {
+    const hit = ctx.match(/mcu '([^']+)': Invalid CAN uuid\s*$/);
+    if (!hit) return null;
+    return {
+      detail: `Klipper stopped connecting to MCU '${hit.m[1]}' with "Invalid CAN uuid": the canbus_uuid in its section is not a hexadecimal number of at most 12 digits. The CAN bus docs show a uuid like 11aa22bb33cc, which canbus_query.py prints for each board.`,
+      evidence: [hit.ev],
+    };
   },
 };

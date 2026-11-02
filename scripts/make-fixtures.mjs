@@ -475,6 +475,105 @@ add('includes-save.cfg', 'An [include] and a SAVE_CONFIG block in one file, with
 add('removed-old-options.cfg', 'One option from every Config_Changes removal added in this audit', 'docs/Config_Changes.md',
   `[printer]\nkinematics: none\nmax_velocity: 300\nmax_accel: 3000\n[input_shaper]\n\n[neopixel a]\npin: PA1\ncolor_order_GRB: False\n\n[servo a]\npin: PA2\nenable: True\n\n[bed_mesh]\nmesh_min: 1, 1\nmesh_max: 2, 2\nmin_point: 1, 1\nmax_point: 2, 2\nbed_radius: 100\nradius: 100\nbed_shape: round\nsamples: 2\nsample_retract_dist: 2\nsamples_result: average\n\n[z_tilt]\nsamples: 2\n\n[extruder]\nactivate_gcode: T0\ndeactivate_gcode: T1\npressure_advance_lookahead_time: 0.01\n\n[firmware_retraction]\nz_hop: 1\n\n[skew_correction]\nxy_skew: 0.1\n\n[sx1509 a]\naddress: 62\n\n[tmc2660 stepper_x]\ndriver_VSENSE: 1\n\n[tmc2130 stepper_y]\ndriver_BLANK_TIME_SELECT: 1\n\n[endstop_phase stepper_z]\nendstop_phase: 1\n\n[display]\nlcd_type: st7567\n`);
 
+// ---- Rules added in 0.2.0. Message strings are from Klipper at the commit named in CHANGELOG.md. ----
+
+// klippy/gcode.py _respond_error() logs a command error as a plain warning line, so each of these is
+// one line (or two, where the message has a "See the ... option" second line) in the middle of a healthy log.
+const commandError = (what, text) => add(what.file, what.title, what.src, session(goodRun(5010, 3) + `\n${text}\n` + goodRun(5020, 2)));
+
+commandError({ file: 'homing-no-trigger.log', title: 'No trigger on an endstop after full movement', src: 'extras/homing.py homing_move' }, 'No trigger on x after full movement');
+commandError({ file: 'homing-no-trigger-probe.log', title: 'No trigger on the probe after full movement', src: 'extras/homing.py homing_move' }, 'No trigger on probe after full movement');
+commandError({ file: 'homing-wrapped-other.log', title: 'The "Error during homing move" wrapper in front of a different message, which is not a missing trigger', src: 'extras/homing.py homing_move' }, 'Error during homing move: Move out of range: 250.000 100.000 10.000 [0.000]');
+commandError({ file: 'homing-still-triggered.log', title: 'Endstop still triggered after retract', src: 'extras/homing.py _do_home_rails' }, 'Endstop y still triggered after retract');
+commandError({ file: 'probe-triggered-early.log', title: 'Probe triggered prior to movement', src: 'extras/homing.py probing_move' }, 'Probe triggered prior to movement');
+commandError({ file: 'homing-comm-timeout.log', title: 'Communication timeout during homing', src: 'mcu.py MCU_endstop.home_wait' }, 'Communication timeout during homing');
+commandError({ file: 'homing-comm-timeout-wrapped.log', title: 'Communication timeout during homing, in the wrapper homing_move adds', src: 'extras/homing.py homing_move, mcu.py MCU_endstop.home_wait' }, 'Error during homing z: Communication timeout during homing');
+commandError({ file: 'extrude-cold.log', title: 'Extrude below minimum temp', src: 'kinematics/extruder.py check_move' }, "Extrude below minimum temp\nSee the 'min_extrude_temp' config option for details");
+commandError({ file: 'extrude-only-too-long.log', title: 'Extrude only move too long', src: 'kinematics/extruder.py check_move' }, "Extrude only move too long (60.000mm vs 50.000mm)\nSee the 'max_extrude_only_distance' config option for details");
+commandError({ file: 'extrude-cross-section.log', title: 'Move exceeds maximum extrusion', src: 'kinematics/extruder.py check_move' }, "Move exceeds maximum extrusion (2.640mm^2 vs 0.640mm^2)\nSee the 'max_extrude_cross_section' config option for details");
+commandError({ file: 'bltouch-verify-sensor.log', title: 'BLTouch failed to verify sensor state', src: 'extras/bltouch.py _test_sensor' }, 'BLTouch failed to verify sensor state');
+commandError({ file: 'bltouch-raise.log', title: 'BLTouch failed to raise probe', src: 'extras/bltouch.py _verify_raise_probe' }, 'BLTouch failed to raise probe');
+
+add('command-errors-in-dump.log', 'A shutdown followed by the request dumps, whose text quotes the new command errors, and the same errors as the cascade after the shutdown', 'mcu.py check_timeout, webhooks.py, gcode.py dump_debug, extras/homing.py',
+  session(goodRun(5010, 2) + `\nTimeout with MCU 'mcu' (eventtime=5014.912345)\n${hostShutdown("Lost communication with MCU 'mcu'")}\nDumping gcode input 5 blocks\n` +
+    ["No trigger on x after full movement", "Endstop y still triggered after retract", "Probe triggered prior to movement", "Communication timeout during homing", "Extrude below minimum temp", "BLTouch failed to verify sensor state", "Scheduled digital out event will exceed max_duration", "Unable to open spi device"]
+      .map((m, i) => `Read 5014.${i}: '${m}\\n'`).join('\n') +
+    `\nMCU 'mcu' shutdown: Command request\n${serialDump}\nNo trigger on x after full movement\nEndstop y still triggered after retract\nProbe triggered prior to movement\nError during homing z: Communication timeout during homing\nExtrude below minimum temp\nSee the 'min_extrude_temp' config option for details\nBLTouch failed to raise probe`));
+
+add('command-errors-midline.log', 'A healthy session where the new command errors are quoted at the end of a line, not at its start as Klipper writes them', 'none, a near miss for the command-error rules',
+  session(goodRun(5010, 3) + `\nwebhooks: client 1: received No trigger on x after full movement\nmacro note: earlier error was Endstop y still triggered after retract\nthe words in a comment: Probe triggered prior to movement\nsaw this in the console: Extrude below minimum temp\nand: BLTouch failed to verify sensor state\n` + goodRun(5020, 2)));
+
+add('probe-healthy.log', 'A healthy session whose probe and homing lines are all normal info output', 'extras/probe.py, extras/homing.py',
+  session(goodRun(5010, 3) + `\nprobe at 100.000,100.000 is z=1.512500\nprobe at 100.000,100.000 is z=1.510000\nprobe: open\nEndstop x is now at 0.000\n` + goodRun(5020, 2)));
+
+// MCU shutdown reasons from the C source. error_mcu.py has no hint for these, so there is no hint block.
+const mcuShutdownOn = (mcu, reason) => `Transition to shutdown state: MCU shutdown\nMCU '${mcu}' shutdown: ${reason}${FIRMWARE_RESTART_TAIL}\n${serialDump}`;
+add('max-duration-digital.log', 'MCU shutdown: Scheduled digital out event will exceed max_duration', 'src/gpiocmds.c',
+  session(goodRun(5010, 3) + '\n' + mcuShutdownOn('mcu', 'Scheduled digital out event will exceed max_duration')));
+add('max-duration-pwm.log', 'MCU shutdown: Scheduled pwm event will exceed max_duration', 'src/pwmcmds.c',
+  session(goodRun(5010, 3) + '\n' + mcuShutdownOn('mcu', 'Scheduled pwm event will exceed max_duration')));
+add('linux-spi-open.log', "MCU shutdown on the Linux host MCU: Unable to open spi device", 'src/linux/spidev.c',
+  session(goodRun(5010, 3) + '\n' + mcuShutdownOn('rpi', 'Unable to open spi device')));
+add('linux-gpio-open.log', "MCU shutdown on the Linux host MCU: Unable to open GPIO chip device, a sibling reason with a different cause", 'src/linux/gpio.c',
+  session(goodRun(5010, 3) + '\n' + mcuShutdownOn('rpi', 'Unable to open GPIO chip device')));
+add('linux-i2c-open.log', "MCU shutdown on the Linux host MCU: Unable to open i2c device", 'src/linux/i2c.c',
+  session(goodRun(5010, 3) + '\n' + mcuShutdownOn('rpi', 'Unable to open i2c device')));
+
+// klippy/serialhdl.py connect_canbus(): warn_prefix is "mcu 'name': ".
+const CAN_PREFIX = "mcu 'mcu': ";
+add('can-uuid-mismatch.log', 'CAN connect where the board answers but its canbus_uuid is not the configured one', 'serialhdl.py connect_canbus',
+  session(`${CAN_PREFIX}Starting CAN connect\n` + `${CAN_PREFIX}Failed to match canbus_uuid - retrying..\n`.repeat(3) +
+    `MCU error during connect\nTraceback (most recent call last):\n  File "/home/pi/klipper/klippy/klippy.py", line 135, in _connect\n    cb()\n  File "/home/pi/klipper/klippy/serialhdl.py", line 130, in connect_canbus\n    self._error("Unable to connect")\nmcu.error: mcu 'mcu': Unable to connect`,
+    { mcu: false }));
+add('can-port-down.log', 'CAN connect where the CAN interface cannot be opened', 'serialhdl.py connect_canbus',
+  session(`${CAN_PREFIX}Starting CAN connect\n` + `${CAN_PREFIX}Unable to open CAN port: [Errno 100] Network is down\n`.repeat(3) +
+    `MCU error during connect\nTraceback (most recent call last):\n  File "/home/pi/klipper/klippy/klippy.py", line 135, in _connect\n    cb()\nmcu.error: mcu 'mcu': Unable to connect`,
+    { mcu: false }));
+add('can-uuid-invalid.log', 'A canbus_uuid that is not a 12 digit hex number', 'serialhdl.py connect_canbus',
+  session(`MCU error during connect\nTraceback (most recent call last):\n  File "/home/pi/klipper/klippy/klippy.py", line 135, in _connect\n    cb()\n  File "/home/pi/klipper/klippy/serialhdl.py", line 129, in connect_canbus\n    self._error("Invalid CAN uuid")\nmcu.error: mcu 'mcu': Invalid CAN uuid\nmcu 'mcu': Invalid CAN uuid\n\nOnce the underlying issue is corrected, use the\n"FIRMWARE_RESTART" command to reset the firmware, reload the\nconfig, and restart the host software.\nError configuring printer`,
+    { mcu: false }));
+
+// Config errors klippy/klippy.py logs as "Config error" with the exception as the last traceback line.
+const configErrorLog = (file, what, src, last, cfg) => add(file, what, src,
+  session(`Config error\nTraceback (most recent call last):\n  File "/home/pi/klipper/klippy/klippy.py", line 135, in _connect\n    self._read_config()\n${last}`, { mcu: false, ...(cfg ? { cfg } : {}) }));
+configErrorLog('config-error-pin-twice.log', 'Config error: pin used multiple times', 'pins.py lookup_pin', 'pins.error: pin PB13 used multiple times in config');
+configErrorLog('config-error-chip-name.log', 'Config error: unknown pin chip name', 'pins.py parse_pin', "pins.error: Unknown pin chip name 'toolhead'");
+configErrorLog('config-error-pin-description.log', 'Config error: invalid pin description', 'pins.py parse_pin', "pins.error: Invalid pin description '!^PA1'\nFormat is: [^~] [!] [chip_name:] pin_name");
+configErrorLog('config-error-choice.log', 'Config error: not a valid choice', 'configfile.py getchoice', "configparser.Error: Choice '17' for option 'microsteps' in section 'stepper_x' is not a valid choice");
+configErrorLog('config-error-kinematics.log', 'Config error: kinematics could not load', 'toolhead.py', "configparser.Error: Error loading kinematics 'cartesion'");
+configErrorLog('config-error-tmc-section.log', 'Config error: tmc driver without its stepper section', 'extras/tmc.py TMCMicrostepHelper', "configparser.Error: Could not find config section '[stepper_q]' required by tmc driver");
+configErrorLog('config-error-sensor.log', 'Config error: unknown temperature sensor', 'extras/heaters.py setup_sensor', "configparser.Error: Unknown temperature sensor 'EPCOS 100k'");
+
+// ---- Config lints added in 0.2.0 ----
+
+add('pin-twice.cfg', 'A pin set on two steppers, a heater and a fan, which Klipper refuses', 'pins.py lookup_pin',
+  `[mcu]\nserial: /dev/serial/by-id/usb-Klipper_example\n\n[printer]\nkinematics: cartesian\nmax_velocity: 300\nmax_accel: 3000\n\n[stepper_x]\nstep_pin: PB13\ndir_pin: PB12\nenable_pin: !PB14\nmicrosteps: 16\nrotation_distance: 40\nendstop_pin: ^PC0\nposition_endstop: 0\nposition_max: 235\n\n[stepper_y]\nstep_pin: !PB13\ndir_pin: PB2\nenable_pin: !PB14\nmicrosteps: 16\nrotation_distance: 40\nendstop_pin: ^PC1\nposition_endstop: 0\nposition_max: 235\n\n[stepper_z]\nstep_pin: mcu:PB0\ndir_pin: PC5\nmicrosteps: 16\nrotation_distance: 8\nendstop_pin: ^PC2\nposition_endstop: 0.5\nposition_max: 250\n\n[extruder]\nstep_pin: PB0\ndir_pin: PB4\nmicrosteps: 16\nrotation_distance: 33\nnozzle_diameter: 0.4\nfilament_diameter: 1.75\nheater_pin: PC8\nsensor_type: EPCOS 100K B57560G104F\nsensor_pin: PA0\ncontrol: watermark\nmin_temp: 0\nmax_temp: 250\n\n[heater_bed]\nheater_pin: PC8\nsensor_type: ATC Semitec 104GT-2\nsensor_pin: PC4\ncontrol: watermark\nmin_temp: 0\nmax_temp: 130\n\n[heater_fan hotend_fan]\npin: PC8\n\n[input_shaper]\n`);
+
+add('pin-sharing-ok.cfg', 'Pins Klipper lets two sections share (enable_pin) and the same pin name on different chips', 'pins.py lookup_pin, extras/stepper_enable.py',
+  `[mcu]\nserial: /dev/serial/by-id/usb-Klipper_example\n\n[mcu toolhead]\ncanbus_uuid: 11aa22bb33cc\n\n[printer]\nkinematics: cartesian\nmax_velocity: 300\nmax_accel: 3000\n\n[stepper_x]\nstep_pin: PB13\ndir_pin: PB12\nenable_pin: !PB14\nmicrosteps: 16\nrotation_distance: 40\nendstop_pin: ^PC0\nposition_endstop: 0\nposition_max: 235\n\n[stepper_y]\nstep_pin: PB10\ndir_pin: PB2\nenable_pin: !PB14\nmicrosteps: 16\nrotation_distance: 40\nendstop_pin: ^PC1\nposition_endstop: 0\nposition_max: 235\n\n[stepper_z]\nstep_pin: PB0\ndir_pin: PC5\nmicrosteps: 16\nrotation_distance: 8\nendstop_pin: ^PC2\nposition_endstop: 0.5\nposition_max: 250\n\n[extruder]\nstep_pin: toolhead:PB0\ndir_pin: toolhead:PB1\nmicrosteps: 16\nrotation_distance: 33\nnozzle_diameter: 0.4\nfilament_diameter: 1.75\nheater_pin: toolhead:PA0\nsensor_type: EPCOS 100K B57560G104F\nsensor_pin: toolhead:PA1\ncontrol: watermark\nmin_temp: 0\nmax_temp: 250\n\n[heater_fan hotend_fan]\npin: PA0\n\n[input_shaper]\n`);
+
+add('pin-twice-override.cfg', 'The same pin on two steppers, with every repeat named in duplicate_pin_override (Klipper allows it)', 'extras/duplicate_pin_override.py',
+  `[mcu]\nserial: /dev/ttyACM0\n\n[printer]\nkinematics: none\nmax_velocity: 300\nmax_accel: 3000\n\n[stepper_z]\nstep_pin: PB0\ndir_pin: PC5\nmicrosteps: 16\nrotation_distance: 8\nendstop_pin: ^PC2\nposition_endstop: 0.5\nposition_max: 250\n\n[stepper_z1]\nstep_pin: !PB0\ndir_pin: PC6\nmicrosteps: 16\nrotation_distance: 8\n\n[duplicate_pin_override]\npins: PB0, PC9\n\n[input_shaper]\n`);
+
+const TMC_BASE = (x, y, z) => `[mcu]\nserial: /dev/ttyACM0\n\n[printer]\nkinematics: cartesian\nmax_velocity: 300\nmax_accel: 3000\n\n[stepper_x]\nstep_pin: PB13\ndir_pin: PB12\nmicrosteps: ${x}\nrotation_distance: 40\nendstop_pin: ^PC0\nposition_endstop: 0\nposition_max: 235\n\n[stepper_y]\nstep_pin: PB10\ndir_pin: PB2\nmicrosteps: ${y}\nrotation_distance: 40\nendstop_pin: ^PC1\nposition_endstop: 0\nposition_max: 235\n\n[stepper_z]\nstep_pin: PB0\ndir_pin: PC5\nmicrosteps: ${z}\nrotation_distance: 8\nendstop_pin: ^PC2\nposition_endstop: 0.5\nposition_max: 250\n\n[input_shaper]\n`;
+add('tmc-microsteps.cfg', 'TMC drivers whose stepper has a microsteps value the TMC code rejects, one it accepts, and a stepper with no TMC driver', 'extras/tmc.py TMCMicrostepHelper, stepper.py',
+  TMC_BASE(17, 64, 12) + `\n[tmc2209 stepper_x]\nuart_pin: PC11\nrun_current: 0.6\n\n[tmc2130 stepper_y]\ncs_pin: PC12\nrun_current: 0.6\n`);
+add('tmc-stepper-missing.cfg', 'A TMC driver section that names a stepper section the config does not have', 'extras/tmc.py TMCMicrostepHelper',
+  TMC_BASE(16, 16, 16) + `\n[tmc2209 stepper_q]\nuart_pin: PC11\nrun_current: 0.6\n\n[tmc2209 stepper_x]\nuart_pin: PC11\nuart_address: 1\nrun_current: 0.6\n`);
+add('tmc-ok.cfg', 'TMC drivers on steppers that exist, every microsteps value one the TMC code accepts', 'extras/tmc.py TMCMicrostepHelper',
+  TMC_BASE(256, 16, 1) + `\n[tmc2209 stepper_x]\nuart_pin: PC11\nrun_current: 0.6\n\n[tmc2209 stepper_y]\nuart_pin: PC11\nuart_address: 1\nrun_current: 0.6\n\n[tmc5160 stepper_z]\ncs_pin: PC12\nrun_current: 0.6\n`);
+
+const KIN = (kin, sections) => `[mcu]\nserial: /dev/ttyACM0\n\n[printer]\nkinematics: ${kin}\nmax_velocity: 300\nmax_accel: 3000\n\n${sections.map((s) => `[stepper_${s}]\nstep_pin: PB${s.charCodeAt(0) % 16}\ndir_pin: PC${s.charCodeAt(0) % 16}\nmicrosteps: 16\nrotation_distance: 40\nendstop_pin: ^PD${s.charCodeAt(0) % 16}\nposition_endstop: 0\nposition_max: 200\n`).join('\n')}\n[input_shaper]\n`;
+add('kinematics-delta-cartesian-sections.cfg', 'kinematics: delta with the stepper_x, stepper_y and stepper_z sections of a cartesian config', 'kinematics/delta.py',
+  KIN('delta', ['x', 'y', 'z']));
+add('kinematics-corexy-no-y.cfg', 'kinematics: corexy with no stepper_y', 'kinematics/corexy.py',
+  KIN('corexy', ['x', 'z']));
+for (const [k, sec] of [['cartesian', ['x', 'y', 'z']], ['delta', ['a', 'b', 'c']], ['polar', ['bed', 'arm', 'z']], ['deltesian', ['left', 'right', 'y']]]) {
+  add(`kinematics-ok-${k}.cfg`, `kinematics: ${k} with the stepper sections it reads`, `kinematics/${k}.py`, KIN(k, sec));
+}
+add('kinematics-none.cfg', 'kinematics: none needs no stepper sections', 'kinematics/none.py',
+  KIN('none', []));
+
 for (const [name, text] of Object.entries(files)) writeFileSync(join(out, name), text);
 
 // ---- Input that is damaged or is not what it claims to be. These are not assembled by add() because

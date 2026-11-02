@@ -8,3 +8,6 @@ export declare const stepRate: CrashRule;
 export declare const commandRequest: CrashRule;
 export declare const spontaneousRestart: CrashRule;
 export declare const protocolMismatch: CrashRule;
+export declare const maxDuration: CrashRule;
+export declare const linuxBusOpen: CrashRule;
+export declare const canUuidInvalid: CrashRule;

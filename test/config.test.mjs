@@ -377,7 +377,8 @@ test('a shared_heater extruder from before its removal is not told it is missing
 });
 
 test('gear_ratio with no rotation_distance is what stepper.py reads as radians: not a missing option', () => {
-  const stepper = (n) => `[stepper_${n}]\nstep_pin: PA1\ndir_pin: PA2\nmicrosteps: 16\ngear_ratio: 80:20\nendstop_pin: PA3\nposition_endstop: 0\nposition_max: 200\n`;
+  // Each stepper has its own pins: Klipper rejects a config that uses one pin twice (pin-used-twice).
+  const stepper = (n) => `[stepper_${n}]\nstep_pin: PB${n.charCodeAt(0) % 16}\ndir_pin: PC${n.charCodeAt(0) % 16}\nmicrosteps: 16\ngear_ratio: 80:20\nendstop_pin: PA3\nposition_endstop: 0\nposition_max: 200\n`;
   const r = analyze(`[printer]\nkinematics: cartesian\nmax_velocity: 1\nmax_accel: 1\n[input_shaper]\n${stepper('x')}${stepper('y')}${stepper('z')}`);
   assert.deepEqual(r.config, []);
 });

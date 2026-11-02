@@ -1,4 +1,5 @@
 import type { ConfigRule } from '../types.js';
+import { kinematicsMissingSection, pinUsedTwice, tmcMicrosteps, tmcStepperMissing } from './hardware.js';
 import { deprecatedOption, removedOption } from './removed.js';
 import { endstopRange, missingRequired, safeZHomeConflict } from './required.js';
 import {
@@ -23,6 +24,10 @@ export const configRules: ConfigRule[] = [
   missingRequired,
   endstopRange,
   safeZHomeConflict,
+  kinematicsMissingSection,
+  pinUsedTwice,
+  tmcMicrosteps,
+  tmcStepperMissing,
   tmcStealthchopThreshold,
   noInputShaper,
   includesNotRead,

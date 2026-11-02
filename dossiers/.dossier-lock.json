@@ -1,0 +1,346 @@
+{
+  "version": 1,
+  "docs": {
+    "klipper-doctor": {
+      "claims": {
+        "d8315691e85a": {
+          "text": "Takes one file, a `klippy.log` or a `printer.cfg`, or reads stdin when given `-`.",
+          "line": 14,
+          "specs": [
+            "src/cli.ts:9-13"
+          ],
+          "head": "4ec1bdde4f599d2fac109c104aae553e7cb4ba08",
+          "files": {
+            "src/cli.ts": {
+              "path": "src/cli.ts",
+              "blob": "cd356002b0609a684fa62254911520c14574a845",
+              "commit": "fb3ab08ad1aa045a8f56f5f4bfd886bacd34c35a",
+              "range": {
+                "start": 9,
+                "end": 13,
+                "hash": "f4e09f93045dde0f9534c3adcd1ab35a56769ae6"
+              }
+            }
+          }
+        },
+        "f614b0e38770": {
+          "text": "Exits 0 when no finding is an error, 1 when at least one is, and 2 for a usage or read error.",
+          "line": 15,
+          "specs": [
+            "src/cli.ts:24",
+            "src/cli.ts:78"
+          ],
+          "head": "4ec1bdde4f599d2fac109c104aae553e7cb4ba08",
+          "files": {
+            "src/cli.ts": {
+              "path": "src/cli.ts",
+              "blob": "cd356002b0609a684fa62254911520c14574a845",
+              "commit": "fb3ab08ad1aa045a8f56f5f4bfd886bacd34c35a",
+              "range": {
+                "start": 24,
+                "end": 24,
+                "hash": "192fd185331b9a8ebcc518baca973fb73be22ff0"
+              }
+            },
+            "src/cli.ts:78-78": {
+              "path": "src/cli.ts",
+              "blob": "cd356002b0609a684fa62254911520c14574a845",
+              "commit": "fb3ab08ad1aa045a8f56f5f4bfd886bacd34c35a",
+              "range": {
+                "start": 78,
+                "end": 78,
+                "hash": "c7d672aa9ae3fe0525ea429c38bb017634f044aa"
+              }
+            }
+          }
+        },
+        "9f7e55bc3015": {
+          "text": "Only the CLI touches the filesystem, and it reads the one file named or stdin.",
+          "line": 16,
+          "specs": [
+            "src/cli.ts:63"
+          ],
+          "head": "4ec1bdde4f599d2fac109c104aae553e7cb4ba08",
+          "files": {
+            "src/cli.ts": {
+              "path": "src/cli.ts",
+              "blob": "cd356002b0609a684fa62254911520c14574a845",
+              "commit": "fb3ab08ad1aa045a8f56f5f4bfd886bacd34c35a",
+              "range": {
+                "start": 63,
+                "end": 63,
+                "hash": "fd906e0e53c1d5d49e505b9d3f084f03c28f3a7a"
+              }
+            }
+          }
+        },
+        "e5c3ec83b707": {
+          "text": "Has no runtime dependencies.",
+          "line": 17,
+          "specs": [
+            "CONTRIBUTING.md:19"
+          ],
+          "head": "4ec1bdde4f599d2fac109c104aae553e7cb4ba08",
+          "files": {
+            "CONTRIBUTING.md": {
+              "path": "CONTRIBUTING.md",
+              "blob": "3e25ef484cc3b514088607484f4382c0a53117af",
+              "commit": "fb3ab08ad1aa045a8f56f5f4bfd886bacd34c35a",
+              "range": {
+                "start": 19,
+                "end": 19,
+                "hash": "036c4bd251f6effaa9257acf877ee446b84231e0"
+              }
+            }
+          }
+        },
+        "0b314b0c5024": {
+          "text": "Declares Node 18 as the minimum version.",
+          "line": 18,
+          "specs": [
+            "package.json:47-49"
+          ],
+          "head": "4ec1bdde4f599d2fac109c104aae553e7cb4ba08",
+          "files": {
+            "package.json": {
+              "path": "package.json",
+              "blob": "5320749f968eaa679826de41f81d6cf6f8f742e1",
+              "commit": "5931800bfd8463c0bce0525070fdfff6faa7c139",
+              "range": {
+                "start": 47,
+                "end": 49,
+                "hash": "78f0a4e08f96d60cdb71e1444f6afbbe699bc7e0"
+              }
+            }
+          }
+        },
+        "1aa977c0204a": {
+          "text": "Gives every finding a severity of `error`, `warning` or `note`.",
+          "line": 19,
+          "specs": [
+            "src/core/types.ts:1"
+          ],
+          "head": "4ec1bdde4f599d2fac109c104aae553e7cb4ba08",
+          "files": {
+            "src/core/types.ts": {
+              "path": "src/core/types.ts",
+              "blob": "34aec1ce365db2618ae67a781db9279cb58eb2b1",
+              "commit": "fb3ab08ad1aa045a8f56f5f4bfd886bacd34c35a",
+              "range": {
+                "start": 1,
+                "end": 1,
+                "hash": "f3d083cd161478bafe3b69ec158ced7f79e33393"
+              }
+            }
+          }
+        },
+        "9f4a7f960aa0": {
+          "text": "Gives every finding an id, a title, a detail, a one-line fix, an optional docs link and evidence lines with line numbers.",
+          "line": 20,
+          "specs": [
+            "src/core/types.ts:9-19"
+          ],
+          "head": "4ec1bdde4f599d2fac109c104aae553e7cb4ba08",
+          "files": {
+            "src/core/types.ts": {
+              "path": "src/core/types.ts",
+              "blob": "34aec1ce365db2618ae67a781db9279cb58eb2b1",
+              "commit": "fb3ab08ad1aa045a8f56f5f4bfd886bacd34c35a",
+              "range": {
+                "start": 9,
+                "end": 19,
+                "hash": "250e63855f5eb8f408c48277645fc13528e9d10d"
+              }
+            }
+          }
+        },
+        "597dbf157a6a": {
+          "text": "Lists errors first, then warnings, then notes.",
+          "line": 21,
+          "specs": [
+            "src/core/index.ts:18"
+          ],
+          "head": "4ec1bdde4f599d2fac109c104aae553e7cb4ba08",
+          "files": {
+            "src/core/index.ts": {
+              "path": "src/core/index.ts",
+              "blob": "caa9b61f2b47a86324fa0bd7a60abc5e06c133bc",
+              "commit": "fb3ab08ad1aa045a8f56f5f4bfd886bacd34c35a",
+              "range": {
+                "start": 18,
+                "end": 18,
+                "hash": "b936c79a3961a03452d97e720eee8fa80cbce0d7"
+              }
+            }
+          }
+        },
+        "f7c5cedb0984": {
+          "text": "Limits a finding's detail to 4000 characters and each evidence line to 2000, so a damaged file cannot produce a huge report.",
+          "line": 22,
+          "specs": [
+            "src/core/index.ts:46-52"
+          ],
+          "head": "4ec1bdde4f599d2fac109c104aae553e7cb4ba08",
+          "files": {
+            "src/core/index.ts": {
+              "path": "src/core/index.ts",
+              "blob": "caa9b61f2b47a86324fa0bd7a60abc5e06c133bc",
+              "commit": "fb3ab08ad1aa045a8f56f5f4bfd886bacd34c35a",
+              "range": {
+                "start": 46,
+                "end": 52,
+                "hash": "968c4e5d444ec112cedc710c28e133b36c2ab840"
+              }
+            }
+          }
+        },
+        "2e34628b3356": {
+          "text": "When a log holds several Klipper starts, analyses the last one.",
+          "line": 23,
+          "specs": [
+            "src/core/index.ts:255"
+          ],
+          "head": "4ec1bdde4f599d2fac109c104aae553e7cb4ba08",
+          "files": {
+            "src/core/index.ts": {
+              "path": "src/core/index.ts",
+              "blob": "caa9b61f2b47a86324fa0bd7a60abc5e06c133bc",
+              "commit": "fb3ab08ad1aa045a8f56f5f4bfd886bacd34c35a",
+              "range": {
+                "start": 255,
+                "end": 255,
+                "hash": "f79d8850de65d083bf4394c805720a10255e8e0c"
+              }
+            }
+          }
+        },
+        "1cd0d2f26cc6": {
+          "text": "The engine is a pure function over text, exported as `analyze`, with `toMarkdown`, `toText` and `rulesMetadata` beside it.",
+          "line": 27,
+          "specs": [
+            "src/core/index.ts:14-15",
+            "src/core/index.ts:314",
+            "src/core/index.ts:333"
+          ],
+          "head": "4ec1bdde4f599d2fac109c104aae553e7cb4ba08",
+          "files": {
+            "src/core/index.ts": {
+              "path": "src/core/index.ts",
+              "blob": "caa9b61f2b47a86324fa0bd7a60abc5e06c133bc",
+              "commit": "fb3ab08ad1aa045a8f56f5f4bfd886bacd34c35a",
+              "range": {
+                "start": 14,
+                "end": 15,
+                "hash": "3791bd61e3a44fb8fc114556c4f8e987bee6e69c"
+              }
+            },
+            "src/core/index.ts:314-314": {
+              "path": "src/core/index.ts",
+              "blob": "caa9b61f2b47a86324fa0bd7a60abc5e06c133bc",
+              "commit": "fb3ab08ad1aa045a8f56f5f4bfd886bacd34c35a",
+              "range": {
+                "start": 314,
+                "end": 314,
+                "hash": "58c10e929b397ad2b7e58719ff1e57a36f23ee15"
+              }
+            },
+            "src/core/index.ts:333-333": {
+              "path": "src/core/index.ts",
+              "blob": "caa9b61f2b47a86324fa0bd7a60abc5e06c133bc",
+              "commit": "fb3ab08ad1aa045a8f56f5f4bfd886bacd34c35a",
+              "range": {
+                "start": 333,
+                "end": 333,
+                "hash": "0063fbfbe607eee0b571cbf015d1e7f773e77caa"
+              }
+            }
+          }
+        },
+        "e59c8f27d1bc": {
+          "text": "The README rule table is generated from the engine's rule metadata.",
+          "line": 28,
+          "specs": [
+            "scripts/gen-rules-table.mjs:5-12"
+          ],
+          "head": "4ec1bdde4f599d2fac109c104aae553e7cb4ba08",
+          "files": {
+            "scripts/gen-rules-table.mjs": {
+              "path": "scripts/gen-rules-table.mjs",
+              "blob": "14255ac1c3691a0f843956325c32379bff8332f6",
+              "commit": "55f1240d71c3184cf27cbe12da27fa7ad3d6bea0",
+              "range": {
+                "start": 5,
+                "end": 12,
+                "hash": "bbc8349874c3fe3ae0783d07c47ff1210e995ac2"
+              }
+            }
+          }
+        },
+        "7c17f4b19258": {
+          "text": "CI typechecks and tests on Node 18 and 22 for every pull request and once a week, and fails when `dist/` or the README rule table is out of date.",
+          "line": 32,
+          "specs": [
+            ".github/workflows/ci.yml:13",
+            ".github/workflows/ci.yml:28",
+            ".github/workflows/ci.yml:36-41"
+          ],
+          "head": "4ec1bdde4f599d2fac109c104aae553e7cb4ba08",
+          "files": {
+            ".github/workflows/ci.yml": {
+              "path": ".github/workflows/ci.yml",
+              "blob": "85d3cfb40c7e5f46be988535a1441c4513f21962",
+              "commit": "1d9014856dc799c05bddcd2f4f704761c931c880",
+              "range": {
+                "start": 13,
+                "end": 13,
+                "hash": "d067568af8a343508129f2b6f1d25fc0dfa88991"
+              }
+            },
+            ".github/workflows/ci.yml:28-28": {
+              "path": ".github/workflows/ci.yml",
+              "blob": "85d3cfb40c7e5f46be988535a1441c4513f21962",
+              "commit": "1d9014856dc799c05bddcd2f4f704761c931c880",
+              "range": {
+                "start": 28,
+                "end": 28,
+                "hash": "e204375b2314ceafcdefea7db76fbf0ec420d256"
+              }
+            },
+            ".github/workflows/ci.yml:36-41": {
+              "path": ".github/workflows/ci.yml",
+              "blob": "85d3cfb40c7e5f46be988535a1441c4513f21962",
+              "commit": "1d9014856dc799c05bddcd2f4f704761c931c880",
+              "range": {
+                "start": 36,
+                "end": 41,
+                "hash": "64b12ab82e087a504653de3c43670faac17c3438"
+              }
+            }
+          }
+        },
+        "8bdbd6f974f0": {
+          "text": "A version tag publishes to npm with provenance, but only when the tag matches `package.json`.",
+          "line": 33,
+          "specs": [
+            ".github/workflows/publish.yml:29-36"
+          ],
+          "head": "4ec1bdde4f599d2fac109c104aae553e7cb4ba08",
+          "files": {
+            ".github/workflows/publish.yml": {
+              "path": ".github/workflows/publish.yml",
+              "blob": "32cbaa47a656b8269a6a854a0e3ea04269c646dd",
+              "commit": "1adeaed70db4a65eac7eff285a7ad2e8504aac0f",
+              "range": {
+                "start": 29,
+                "end": 36,
+                "hash": "138b784fca269373abdd25f45d7326519e43c69f"
+              }
+            }
+          }
+        }
+      },
+      "pinnedAt": "2026-11-02T14:19:04.296Z",
+      "head": "4ec1bdde4f599d2fac109c104aae553e7cb4ba08"
+    }
+  }
+}

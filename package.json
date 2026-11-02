@@ -1,6 +1,6 @@
 {
   "name": "klipper-doctor",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Explains why a Klipper print or session died and lints the printer config, from a klippy.log or printer.cfg.",
   "keywords": [
     "klipper",
@@ -18,20 +18,38 @@
   "license": "MIT",
   "author": "kd-011",
   "homepage": "https://github.com/kd-011/klipper-doctor#readme",
-  "repository": { "type": "git", "url": "git+https://github.com/kd-011/klipper-doctor.git" },
-  "bugs": { "url": "https://github.com/kd-011/klipper-doctor/issues" },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kd-011/klipper-doctor.git"
+  },
+  "bugs": {
+    "url": "https://github.com/kd-011/klipper-doctor/issues"
+  },
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
-    ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
     "./package.json": "./package.json"
   },
-  "bin": { "klipper-doctor": "dist/cli.js" },
-  "files": ["dist", "README.md", "LICENSE"],
+  "bin": {
+    "klipper-doctor": "dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "sideEffects": false,
-  "engines": { "node": ">=18" },
-  "publishConfig": { "access": "public" },
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json && node -e \"require('fs').chmodSync('dist/cli.js', 0o755)\"",
     "check": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.core.json --noEmit",

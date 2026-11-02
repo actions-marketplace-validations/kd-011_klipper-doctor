@@ -1,0 +1,10 @@
+import type { CrashRule } from '../types.js';
+export declare const timerTooClose: CrashRule;
+export declare const missedScheduling: CrashRule;
+export declare const lostCommunication: CrashRule;
+export declare const connectFailed: CrashRule;
+export declare const adcOutOfRange: CrashRule;
+export declare const stepRate: CrashRule;
+export declare const commandRequest: CrashRule;
+export declare const spontaneousRestart: CrashRule;
+export declare const protocolMismatch: CrashRule;

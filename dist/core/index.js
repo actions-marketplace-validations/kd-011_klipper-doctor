@@ -1,0 +1,166 @@
+import { parseConfig } from './configParser.js';
+import { looksLikeLog, parseLog, splitLines } from './logParser.js';
+import { configRules } from './rules/config/index.js';
+import { crashRules } from './rules/crash/index.js';
+import { failureEvidence, noFailure, noFailureMeta, unknownReason, unknownReasonMeta } from './rules/crash/fallback.js';
+import { KLIPPER_SRC } from './rules/types.js';
+export { toMarkdown, toText, verdict, countBySeverity } from './report.js';
+export { VERSION } from './version.js';
+const SEVERITY_RANK = { error: 0, warning: 1, note: 2 };
+const noConfigDumpMeta = {
+    id: 'no-config-dump',
+    severity: 'note',
+    title: 'No config dump in the log',
+    detail: 'Klipper writes the full config into klippy.log near the top of each start, between "===== Config file =====" and a line of "=". This session has none, usually because the log was cut off or rotated.',
+    fix: 'Run klipper-doctor on the whole klippy.log, or on printer.cfg itself.',
+    docs: KLIPPER_SRC + 'klippy/configfile.py',
+};
+function toFinding(meta, hit) {
+    return {
+        id: meta.id,
+        severity: hit.severity ?? meta.severity,
+        title: hit.title ?? meta.title,
+        detail: hit.detail ?? meta.detail,
+        fix: hit.fix ?? meta.fix,
+        docs: meta.docs,
+        evidence: [...hit.evidence].sort((a, b) => a.line - b.line),
+    };
+}
+function sortFindings(list) {
+    // Stable: severity first, then position in the input, then rule order.
+    return list
+        .map((f, i) => ({ f, i }))
+        .sort((a, b) => SEVERITY_RANK[a.f.severity] - SEVERITY_RANK[b.f.severity] ||
+        (a.f.evidence[0]?.line ?? 1e12) - (b.f.evidence[0]?.line ?? 1e12) ||
+        a.i - b.i)
+        .map((x) => x.f);
+}
+function analyzeConfigLines(cfgLines, firstLine, raw, lineText, klipperVersion) {
+    const cfg = parseConfig(cfgLines, firstLine, raw);
+    const ctx = { cfg, raw, lineText, klipperVersion };
+    const findings = [];
+    for (const rule of configRules) {
+        if (rule.scope === 'raw' && !raw)
+            continue;
+        if (rule.needsComplete && raw && cfg.includes.length > 0)
+            continue;
+        for (const hit of rule.check(ctx))
+            findings.push(toFinding(rule, hit));
+    }
+    return { cfg, findings: sortFindings(findings) };
+}
+function makeCrashContext(session, sessionCount, config) {
+    const notable = session.notable;
+    const indexAfter = (line) => {
+        let lo = 0;
+        let hi = notable.length;
+        while (lo < hi) {
+            const mid = (lo + hi) >> 1;
+            if (notable[mid].line <= line)
+                lo = mid + 1;
+            else
+                hi = mid;
+        }
+        return lo;
+    };
+    const match = (re) => {
+        for (const ev of notable) {
+            const m = re.exec(ev.text);
+            if (m)
+                return { m, ev };
+        }
+        return undefined;
+    };
+    return {
+        session,
+        sessionCount,
+        config,
+        notable,
+        shutdown: session.shutdowns[0],
+        match,
+        find: (re) => match(re)?.ev,
+        findAll(re, limit = 20) {
+            const out = [];
+            for (const ev of notable) {
+                if (re.test(ev.text)) {
+                    out.push(ev);
+                    if (out.length >= limit)
+                        break;
+                }
+            }
+            return out;
+        },
+        after: (line, count) => notable.slice(indexAfter(line), indexAfter(line) + count),
+    };
+}
+export function analyze(text, opts = {}) {
+    const lines = splitLines(text);
+    const isLog = looksLikeLog(lines) || (opts.filename !== undefined && /\.log(\.\d+)?$/i.test(opts.filename));
+    const lineText = (n) => lines[n - 1] ?? '';
+    if (!isLog) {
+        const { findings } = analyzeConfigLines(lines, 1, true, lineText);
+        return {
+            meta: { inputKind: 'printer.cfg', mcus: [], sessions: 0, linesRead: lines.length, analysedSession: 0 },
+            config: findings,
+            crash: [],
+        };
+    }
+    const parsed = parseLog(lines);
+    const session = parsed.sessions[parsed.sessions.length - 1];
+    let config;
+    let cfg;
+    if (session.config) {
+        const r = analyzeConfigLines(session.config.lines, session.config.startLine, false, lineText, session.klipperVersion);
+        config = r.findings;
+        cfg = r.cfg;
+    }
+    else {
+        config = [toFinding(noConfigDumpMeta, { evidence: [] })];
+    }
+    const ctx = makeCrashContext(session, parsed.sessions.length, cfg);
+    const crash = [];
+    for (const rule of crashRules) {
+        const hit = rule.check(ctx);
+        if (hit)
+            crash.push(toFinding(rule, hit));
+    }
+    // Only an error-level finding explains a Klipper failure. Warning-level findings (gcode command
+    // errors such as Move out of range) leave Klipper running, so they must not hide an unexplained
+    // shutdown that is also in the log.
+    if (!crash.some((f) => f.severity === 'error')) {
+        if (failureEvidence(ctx).length > 0) {
+            const hit = unknownReason(ctx);
+            if (hit)
+                crash.push(toFinding(unknownReasonMeta, hit));
+        }
+        else if (crash.length === 0) {
+            crash.push(toFinding(noFailureMeta, noFailure(ctx)));
+        }
+    }
+    const mcus = new Map();
+    for (const m of session.mcus)
+        mcus.set(m.name, m);
+    return {
+        meta: {
+            inputKind: 'klippy.log',
+            klipperVersion: session.klipperVersion,
+            mcus: [...mcus.values()],
+            sessions: parsed.sessions.length,
+            linesRead: lines.length,
+            analysedSession: session.index,
+        },
+        config,
+        crash,
+    };
+}
+/** Every rule klipper-doctor can fire, for the README table and for docs. */
+export function rulesMetadata() {
+    const strip = (r) => ({ id: r.id, severity: r.severity, title: r.title, detail: r.detail, fix: r.fix, docs: r.docs });
+    return [
+        ...crashRules.map((r) => ({ kind: 'crash', ...strip(r) })),
+        { kind: 'crash', ...unknownReasonMeta },
+        { kind: 'crash', ...noFailureMeta },
+        ...configRules.map((r) => ({ kind: 'config', ...strip(r) })),
+        { kind: 'config', ...noConfigDumpMeta },
+    ];
+}

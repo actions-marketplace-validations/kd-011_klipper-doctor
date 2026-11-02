@@ -1,0 +1,22 @@
+# fixture: A log cut off before the config dump (starts mid-session, as after rotation)
+# made by scripts/make-fixtures.mjs from message formats in the Klipper source (queuelogger.py doRollover). Not a real user's log.
+Stats 9000.1: gcodein=0  mcu: mcu_awake=0.001 mcu_task_avg=0.000009 bytes_retransmit=0 freq=72000123 sysload=0.30 cputime=40.5 memavail=790000
+Stats 9001.0: gcodein=0  mcu: mcu_awake=0.001 mcu_task_avg=0.000009 mcu_task_stddev=0.000012 bytes_write=1400 bytes_read=1800 bytes_retransmit=0 bytes_invalid=0 send_seq=100 receive_seq=100 retransmit_seq=0 srtt=0.001 rttvar=0.000 rto=0.025 ready_bytes=0 upcoming_bytes=0 freq=72000123 heater_bed: target=60 temp=59.8 pwm=0.250 sysload=0.22 cputime=2.5 memavail=800000
+Stats 9002.0: gcodein=0  mcu: mcu_awake=0.001 mcu_task_avg=0.000009 mcu_task_stddev=0.000012 bytes_write=1400 bytes_read=1800 bytes_retransmit=0 bytes_invalid=0 send_seq=100 receive_seq=100 retransmit_seq=0 srtt=0.001 rttvar=0.000 rto=0.025 ready_bytes=0 upcoming_bytes=0 freq=72000123 heater_bed: target=60 temp=59.8 pwm=0.250 sysload=0.22 cputime=2.5 memavail=800000
+Transition to shutdown state: MCU shutdown
+MCU 'mcu' shutdown: Timer too close
+
+This often indicates the host computer is overloaded. Check
+for other processes consuming excessive CPU time, high swap
+usage, disk errors, overheating, unstable voltage, or
+similar system problems on the host computer.
+
+Once the underlying issue is corrected, use the
+"FIRMWARE_RESTART" command to reset the firmware, reload the
+config, and restart the host software.
+Printer is shutdown
+Dumping serial stats: bytes_write=2400 bytes_read=3100 bytes_retransmit=2 bytes_invalid=0 send_seq=140 receive_seq=140 retransmit_seq=1 srtt=0.002 rttvar=0.000 rto=0.025 ready_bytes=0 upcoming_bytes=0
+Dumping send queue 3 messages
+Send: 4 1793.5 1793.5 7: seq: 1c, queue_step oid=2 interval=4000 count=10 add=0
+Dumping receive queue 2 messages
+Receive: 0 5410.2 5410.2 5: seq: 1d, status clock=1234567 status_clock=1234500

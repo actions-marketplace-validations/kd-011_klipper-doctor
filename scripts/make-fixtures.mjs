@@ -1,0 +1,368 @@
+// Builds test/fixtures/*.log from hand-written pieces. Nothing here comes from a
+// real user's log: every line is assembled from the message formats in the
+// Klipper source (klippy/klippy.py, mcu.py, serialhdl.py, configfile.py,
+// extras/error_mcu.py, extras/verify_heater.py, extras/tmc.py, toolhead.py,
+// src/*.c). Run: node scripts/make-fixtures.mjs
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const out = join(dirname(fileURLToPath(import.meta.url)), '..', 'test', 'fixtures');
+mkdirSync(out, { recursive: true });
+
+const VERSION = 'v0.12.0-250-g1a2b3c4d';
+
+const header = (what, src) =>
+  `# fixture: ${what}\n# made by scripts/make-fixtures.mjs from message formats in the Klipper source (${src}). Not a real user's log.\n`;
+
+// What Klipper writes as the config dump: comments stripped, option names
+// lowercased, "key = value", continuation lines tab-indented
+// (klippy/configfile.py build_config_string, RawConfigParser.write).
+const CONFIG_DUMP = `[mcu]
+serial = /dev/serial/by-id/usb-Klipper_stm32f103xe_ABC123-if00
+
+[printer]
+kinematics = cartesian
+max_velocity = 300
+max_accel = 3000
+
+[stepper_x]
+step_pin = PB13
+dir_pin = !PB12
+enable_pin = !PB14
+microsteps = 16
+rotation_distance = 40
+endstop_pin = ^PC0
+position_endstop = 0
+position_max = 235
+homing_speed = 50
+
+[stepper_y]
+step_pin = PB10
+dir_pin = !PB2
+enable_pin = !PB11
+microsteps = 16
+rotation_distance = 40
+endstop_pin = ^PC1
+position_endstop = 0
+position_max = 235
+homing_speed = 50
+
+[stepper_z]
+step_pin = PB0
+dir_pin = PC5
+enable_pin = !PB1
+microsteps = 16
+rotation_distance = 8
+endstop_pin = ^PC2
+position_endstop = 0.5
+position_max = 250
+
+[extruder]
+step_pin = PB3
+dir_pin = !PB4
+enable_pin = !PD2
+microsteps = 16
+rotation_distance = 33.683
+nozzle_diameter = 0.400
+filament_diameter = 1.750
+heater_pin = PC8
+sensor_type = EPCOS 100K B57560G104F
+sensor_pin = PA0
+control = pid
+pid_kp = 26.213
+pid_ki = 1.304
+pid_kd = 131.721
+min_temp = 0
+max_temp = 270
+
+[heater_bed]
+heater_pin = PC9
+sensor_type = ATC Semitec 104GT-2
+sensor_pin = PC4
+control = watermark
+min_temp = 0
+max_temp = 130
+
+[tmc2209 stepper_x]
+uart_pin = PC11
+tx_pin = PC10
+uart_address = 0
+run_current = 0.580
+stealthchop_threshold = 999999
+
+[input_shaper]
+shaper_freq_x = 58.2
+shaper_type_x = mzv
+shaper_freq_y = 41.6
+shaper_type_y = mzv
+
+[gcode_macro START_PRINT]
+gcode =
+\tG28
+\tG1 Z10 F600
+\tM109 S{params.EXTRUDER|default(200)}`;
+
+const MCU_VERSION_LINES = (v = VERSION) =>
+  `Loaded MCU 'mcu' 112 commands (${v} / gcc: (15:7-2018-q2-1) 7.3.1 20180622 (release) [ARM/embedded-7-branch revision 261907] binutils: (2.31.1-0))
+MCU 'mcu' config: ADC_MAX=4095 BUS_PINS_i2c1=PB6,PB7 CLOCK_FREQ=72000000 MCU=stm32f103xe PWM_MAX=255 SERIAL_BAUD=250000 STEPPER_BOTH_EDGE=1
+MCU 'mcu' kconfig: {'CONFIG_MACH_STM32': 1, 'CONFIG_MCU': 'stm32f103xe'}
+Configured MCU 'mcu' (1024 moves)`;
+
+const PREAMBLE = (v = VERSION) => `Starting Klippy...
+Args: ['/home/pi/klipper/klippy/klippy.py', '/home/pi/printer_data/config/printer.cfg', '-I', '/home/pi/printer_data/comms/klippy.serial', '-l', '/home/pi/printer_data/logs/klippy.log', '-a', '/home/pi/printer_data/comms/klippy.sock']
+Git version: '${v}'
+Branch: master
+Remote: origin
+Tracked URL: https://github.com/Klipper3d/klipper
+CPU: 4 core ARMv7 Processor rev 4 (v7l)
+Device: Raspberry Pi 3 Model B Rev 1.2
+Linux: Linux version 6.1.21-v7+ (dom@buildbot) (arm-linux-gnueabihf-gcc-12 (Raspbian 12.2.0-14+rpi1) 12.2.0) #1642 SMP Mon Apr  3 17:20:52 BST 2023
+Python: '3.9.2 (default, Feb 28 2021, 17:03:44) \\n[GCC 10.2.1 20210110]'`;
+
+const START = (t = 'Sun Nov  1 10:00:00 2026', mono = 5000.0) =>
+  `Start printer at ${t} (${1793527200 + (mono - 5000)}.0 ${mono.toFixed(1)})`;
+
+const configBlock = (cfg = CONFIG_DUMP) => `===== Config file =====\n${cfg}\n=======================`;
+
+const stats = (t, extra = '') =>
+  `Stats ${t.toFixed(1)}: gcodein=0  mcu: mcu_awake=0.001 mcu_task_avg=0.000009 mcu_task_stddev=0.000012 bytes_write=1400 bytes_read=1800 bytes_retransmit=0 bytes_invalid=0 send_seq=100 receive_seq=100 retransmit_seq=0 srtt=0.001 rttvar=0.000 rto=0.025 ready_bytes=0 upcoming_bytes=0 freq=72000123 heater_bed: target=60 temp=59.8 pwm=0.250 sysload=0.22 cputime=2.5 memavail=800000${extra}`;
+
+const goodRun = (from, n) =>
+  Array.from({ length: n }, (_, i) => stats(from + i * 1)).join('\n');
+
+const FIRMWARE_RESTART_TAIL = `
+Once the underlying issue is corrected, use the
+"FIRMWARE_RESTART" command to reset the firmware, reload the
+config, and restart the host software.
+Printer is shutdown`;
+
+const serialDump = `Dumping serial stats: bytes_write=2400 bytes_read=3100 bytes_retransmit=2 bytes_invalid=0 send_seq=140 receive_seq=140 retransmit_seq=1 srtt=0.002 rttvar=0.000 rto=0.025 ready_bytes=0 upcoming_bytes=0
+Dumping send queue 3 messages
+Send: 4 1793.5 1793.5 7: seq: 1c, queue_step oid=2 interval=4000 count=10 add=0
+Dumping receive queue 2 messages
+Receive: 0 5410.2 5410.2 5: seq: 1d, status clock=1234567 status_clock=1234500`;
+
+const mcuShutdown = (reason, hint) =>
+  `Transition to shutdown state: MCU shutdown
+MCU 'mcu' shutdown: ${reason}${hint ? '\n' + hint : ''}${FIRMWARE_RESTART_TAIL}
+${serialDump}`;
+
+const hostShutdown = (msg) =>
+  `Transition to shutdown state: ${msg}\n${msg}${FIRMWARE_RESTART_TAIL}`;
+
+const HINT_TIMER = `
+This often indicates the host computer is overloaded. Check
+for other processes consuming excessive CPU time, high swap
+usage, disk errors, overheating, unstable voltage, or
+similar system problems on the host computer.
+`;
+
+const session = (body, { cfg = CONFIG_DUMP, v = VERSION, t, mono = 5000.0, preamble = true, config = true, mcu = true } = {}) =>
+  [
+    preamble ? PREAMBLE(v) : '',
+    START(t, mono),
+    config ? configBlock(cfg) : '',
+    mcu ? MCU_VERSION_LINES(v) : '',
+    body,
+  ]
+    .filter(Boolean)
+    .join('\n') + '\n';
+
+const files = {};
+const add = (name, what, src, text) => {
+  files[name] = header(what, src) + text;
+};
+
+add('clean.log', 'one complete session with no failure and a clean config', 'klippy.py, configfile.py, mcu.py, statistics.py',
+  session(goodRun(5010, 6)));
+
+add('timer-too-close.log', 'MCU shutdown: Timer too close', 'src/sched.c, extras/error_mcu.py',
+  session(goodRun(5010, 4) + '\n' + mcuShutdown('Timer too close', HINT_TIMER)));
+
+add('missed-scheduling.log', 'MCU shutdown: Missed scheduling of next digital out event', 'src/gpiocmds.c, extras/error_mcu.py',
+  session(goodRun(5010, 4) + '\n' + mcuShutdown('Missed scheduling of next digital out event',
+    `\nThis is generally indicative of an intermittent\ncommunication failure between micro-controller and host.\n`)));
+
+add('lost-communication.log', 'Lost communication with MCU', 'mcu.py check_timeout, extras/error_mcu.py',
+  session(goodRun(5010, 4) + `\nTimeout with MCU 'mcu' (eventtime=5014.912345)\n` + hostShutdown("Lost communication with MCU 'mcu'") + '\n' + serialDump));
+
+add('connect-failed.log', 'Unable to connect to the MCU (serial device missing)', 'serialhdl.py connect_uart, klippy.py _connect',
+  session(
+    `mcu 'mcu': Starting serial connect
+mcu 'mcu': Unable to open serial port: [Errno 2] could not open port /dev/serial/by-id/usb-Klipper_stm32f103xe_ABC123-if00: [Errno 2] No such file or directory: '/dev/serial/by-id/usb-Klipper_stm32f103xe_ABC123-if00'
+mcu 'mcu': Unable to open serial port: [Errno 2] could not open port /dev/serial/by-id/usb-Klipper_stm32f103xe_ABC123-if00: [Errno 2] No such file or directory: '/dev/serial/by-id/usb-Klipper_stm32f103xe_ABC123-if00'
+MCU error during connect
+Traceback (most recent call last):
+  File "/home/pi/klipper/klippy/klippy.py", line 135, in _connect
+    cb()
+  File "/home/pi/klipper/klippy/mcu.py", line 800, in _connect
+    self._serial.connect_uart(self._serialport, self._baud, rts)
+  File "/home/pi/klipper/klippy/serialhdl.py", line 192, in connect_uart
+    self._error("Unable to connect")
+mcu.error: mcu 'mcu': Unable to connect`,
+    { mcu: false }));
+
+add('adc-out-of-range.log', 'MCU shutdown: ADC out of range with the sensor clarification line', 'src/adccmds.c, extras/adc_temperature.py, extras/error_mcu.py',
+  session(goodRun(5010, 3) + '\n' + mcuShutdown('ADC out of range',
+    `\nSensor 'extruder' temperature -273.150 not in range 0.000:270.000\n\nThis generally occurs when a heater temperature exceeds\nits configured min_temp or max_temp.\n`)));
+
+add('heater-not-heating.log', 'Heater extruder not heating at expected rate', 'extras/verify_heater.py',
+  session(goodRun(5010, 3) + `\nHeater extruder not heating at expected rate
+${hostShutdown('Heater extruder not heating at expected rate\nSee the \'verify_heater\' section in docs/Config_Reference.md\nfor the parameters that control this check.')}`));
+
+add('tmc-uart.log', "Unable to read tmc uart 'stepper_x' register IFCNT", 'extras/tmc_uart.py',
+  session(`Unable to read tmc uart 'stepper_x' register IFCNT
+Unhandled exception during connect
+Traceback (most recent call last):
+  File "/home/pi/klipper/klippy/klippy.py", line 135, in _connect
+    cb()
+  File "/home/pi/klipper/klippy/extras/tmc_uart.py", line 242, in _do_get_register
+    "Unable to read tmc uart '%s' register %s" % (self.name, reg_name))
+gcode.CommandError: Unable to read tmc uart 'stepper_x' register IFCNT`));
+
+add('tmc-error.log', 'TMC reports error with an overtemperature flag', 'extras/tmc.py',
+  session(goodRun(5010, 3) + `\nTMC 'stepper_y' reports DRV_STATUS: 80070000 otpw=1(OvertempWarning!) ot=1(OvertempError!)
+${hostShutdown("TMC 'stepper_y' reports error: DRV_STATUS: 80070000 otpw=1(OvertempWarning!) ot=1(OvertempError!)")}`));
+
+add('tmc-spi.log', "Unable to write tmc spi 'stepper_x' register GCONF", 'extras/tmc2130.py',
+  session(`Unable to write tmc spi 'stepper_x' register GCONF
+Unhandled exception during connect
+Traceback (most recent call last):
+  File "/home/pi/klipper/klippy/klippy.py", line 135, in _connect
+    cb()
+gcode.CommandError: Unable to write tmc spi 'stepper_x' register GCONF`));
+
+add('move-out-of-range.log', 'Move out of range after G1 beyond position_max', 'toolhead.py move_error, gcode.py _respond_error',
+  session(goodRun(5010, 3) + `\nMove out of range: 250.000 100.000 10.000 [5.000]`));
+
+add('must-home.log', 'Must home axis first', 'kinematics/cartesian.py, toolhead.py move_error',
+  session(goodRun(5010, 2) + `\nMust home axis first: 100.000 100.000 10.000 [0.000]`));
+
+add('shutdown-after-gcode-error.log', 'A Move out of range command error, then a real shutdown no rule recognises', 'toolhead.py move_error, mcu.py _handle_shutdown, extras/error_mcu.py',
+  session(goodRun(5010, 2) + `\nMove out of range: 250.000 100.000 10.000 [5.000]\n` + goodRun(5020, 2) + '\n' + mcuShutdown('Some future firmware reason', '')));
+
+add('rescheduled-timer.log', 'MCU shutdown: Rescheduled timer in the past', 'src/generic/timer_irq.c, extras/error_mcu.py',
+  session(goodRun(5010, 3) + '\n' + mcuShutdown('Rescheduled timer in the past',
+    `\nThis generally occurs when the micro-controller has been\nrequested to step at a rate higher than it is capable of\nobtaining.\n`)));
+
+add('stepper-too-far.log', 'MCU shutdown: Stepper too far in past', 'src/stepper.c, extras/error_mcu.py',
+  session(goodRun(5010, 3) + '\n' + mcuShutdown('Stepper too far in past',
+    `\nThis generally occurs when the micro-controller has been\nrequested to step at a rate higher than it is capable of\nobtaining.\n`)));
+
+add('protocol-mismatch.log', 'Protocol error from an MCU running older firmware than the host', 'klippy.py _connect, extras/error_mcu.py _check_protocol_error',
+  session(
+    `Protocol error
+Traceback (most recent call last):
+  File "/home/pi/klipper/klippy/klippy.py", line 135, in _connect
+    cb()
+  File "/home/pi/klipper/klippy/mcu.py", line 800, in _connect
+    self._serial.connect_uart(self._serialport, self._baud, rts)
+msgproto.error: mcu 'mcu': Unknown command: set_next_step_dir
+MCU Protocol error
+
+This is frequently caused by running an older version of the
+firmware on the MCU(s). Fix by recompiling and flashing the
+firmware.
+
+Your Klipper version is: ${VERSION}
+MCU(s) which should be updated:
+mcu: Current version v0.11.0-33-g99aabbcc
+Up-to-date MCU(s):
+<none>
+
+Once the underlying issue is corrected, use the "RESTART"
+command to reload the config and restart the host software.
+
+mcu 'mcu': Unknown command: set_next_step_dir`,
+    { mcu: false }));
+
+add('stepcompress.log', 'Internal error in stepcompress while syncing stepper position', 'stepper.py note_homing_end',
+  session(goodRun(5010, 3) + `\nInternal error on command:"G28"
+Traceback (most recent call last):
+  File "/home/pi/klipper/klippy/gcode.py", line 222, in _process_commands
+    handler(gcmd)
+  File "/home/pi/klipper/klippy/stepper.py", line 208, in note_homing_end
+    raise error("Internal error in stepcompress")
+stepper.error: Internal error in stepcompress
+${hostShutdown('Internal error on command:"G28"')}`));
+
+add('command-request.log', 'M112 emergency stop (shutdown reason: Command request)', 'extras/error_mcu.py',
+  session(goodRun(5010, 3) + '\n' + mcuShutdown('Command request',
+    `\nThis generally occurs in response to an M112 G-Code command\nor in response to an internal error in the host software.\n`)));
+
+add('spontaneous-restart.log', "MCU 'mcu' spontaneous restart", 'mcu.py _handle_starting',
+  session(goodRun(5010, 3) + `\n${hostShutdown("MCU 'mcu' spontaneous restart")}`));
+
+add('config-error-invalid-option.log', "Config error: Option 'pid_integral_max' is not valid in section 'extruder'", 'klippy.py _connect, configfile.py check_unused',
+  session(`Config error
+Traceback (most recent call last):
+  File "/home/pi/klipper/klippy/klippy.py", line 135, in _connect
+    self._read_config()
+  File "/home/pi/klipper/klippy/klippy.py", line 124, in _read_config
+    pconfig.check_unused_options(config)
+  File "/home/pi/klipper/klippy/configfile.py", line 440, in check_unused
+    raise error("Option '%s' is not valid in section '%s'"
+configparser.Error: Option 'pid_integral_max' is not valid in section 'extruder'`,
+    { cfg: CONFIG_DUMP.replace('pid_kd = 131.721', 'pid_kd = 131.721\npid_integral_max = 0.2'), mcu: false }));
+
+add('config-error-missing-option.log', "Config error: Option 'rotation_distance' in section 'stepper_z' must be specified", 'klippy.py _connect, configfile.py _get_wrapper',
+  session(`Config error
+Traceback (most recent call last):
+  File "/home/pi/klipper/klippy/klippy.py", line 135, in _connect
+    self._read_config()
+configparser.Error: Option 'rotation_distance' in section 'stepper_z' must be specified`,
+    { mcu: false }));
+
+add('unknown-reason.log', 'MCU shutdown with a reason no rule knows, to exercise the fallback', 'mcu.py _handle_shutdown, extras/error_mcu.py',
+  session(goodRun(5010, 3) + '\n' + mcuShutdown('Some future firmware reason', '')));
+
+add('multi-session.log', 'Three Klipper starts in one file: the last one is clean, the first two died', 'klippy.py run',
+  [
+    session(goodRun(5010, 2) + '\n' + mcuShutdown('Timer too close', HINT_TIMER), { mono: 5000.0 }),
+    `Restarting printer\n` + session(goodRun(6010, 2) + `\n` + hostShutdown("Lost communication with MCU 'mcu'"), { mono: 6000.0, preamble: false, t: 'Sun Nov  1 11:00:00 2026' }),
+    `Restarting printer\n` + session(goodRun(7010, 5), { mono: 7000.0, preamble: false, t: 'Sun Nov  1 12:00:00 2026' }),
+  ].join(''));
+
+add('multi-session-last-crashed.log', 'Two Klipper starts: the first is clean, the last died with Timer too close', 'klippy.py run',
+  [
+    session(goodRun(5010, 4), { mono: 5000.0 }),
+    `Restarting printer\n` + session(goodRun(6010, 2) + '\n' + mcuShutdown('Timer too close', HINT_TIMER), { mono: 6000.0, preamble: false, t: 'Sun Nov  1 11:00:00 2026' }),
+  ].join(''));
+
+add('truncated.log', 'A log cut off before the config dump (starts mid-session, as after rotation)', 'queuelogger.py doRollover',
+  `Stats 9000.1: gcodein=0  mcu: mcu_awake=0.001 mcu_task_avg=0.000009 bytes_retransmit=0 freq=72000123 sysload=0.30 cputime=40.5 memavail=790000
+${goodRun(9001, 2)}
+${mcuShutdown('Timer too close', HINT_TIMER)}
+`);
+
+add('rollover-header.log', 'A rotated log: starts with the rollover block (versions, config) instead of Start printer at', 'queuelogger.py doRollover',
+  `${PREAMBLE()}
+${configBlock()}
+${MCU_VERSION_LINES()}
+=============== Log rollover at Mon Nov  2 00:00:00 2026 ===============
+${goodRun(90000, 3)}
+`);
+
+add('rollover-shutdown-restart.log', 'A log rotated at midnight: the rollover block, a run that ended in a shutdown, then a restart and a clean run', 'queuelogger.py doRollover, klippy.py run',
+  `${PREAMBLE()}
+${configBlock()}
+${MCU_VERSION_LINES()}
+=============== Log rollover at Mon Nov  2 00:00:00 2026 ===============
+${goodRun(90000, 3)}
+${mcuShutdown('Timer too close', HINT_TIMER)}
+Restarting printer
+` + session(goodRun(91000, 4), { mono: 91000.0, preamble: false, t: 'Mon Nov  2 00:30:00 2026' }));
+
+add('config-findings.log', 'A clean session whose dumped config has removed options and a mixed stealthchop threshold', 'configfile.py, TMC_Drivers.md',
+  session(goodRun(5010, 3), {
+    cfg: CONFIG_DUMP
+      .replace('pid_kd = 131.721', 'pid_kd = 131.721\npid_integral_max = 0.2')
+      .replace('stealthchop_threshold = 999999', 'stealthchop_threshold = 500'),
+  }));
+
+for (const [name, text] of Object.entries(files)) writeFileSync(join(out, name), text);
+
+// CRLF copy of the clean log (Windows editors, some download paths).
+writeFileSync(join(out, 'crlf.log'), files['clean.log'].replace(/\n/g, '\r\n').replace('# fixture: one complete', '# fixture: CRLF copy of clean.log, one complete'));
+console.log(`wrote ${Object.keys(files).length + 1} fixtures to ${out}`);

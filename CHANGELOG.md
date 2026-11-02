@@ -6,6 +6,8 @@ All notable changes to this project are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-02
+
 Messages in the new rules are from Klipper at commit 0cee841 (28 October 2026).
 
 ### Added
@@ -51,5 +53,6 @@ First release.
 - Library export: `analyze`, `toMarkdown`, `toText` and `rulesMetadata`. ESM, zero runtime dependencies, runs in Node and in the browser.
 - Every rule cites the Klipper docs or source it comes from, and the README rule table is generated from the rules' own metadata.
 
+[0.3.0]: https://github.com/kd-011/klipper-doctor/releases/tag/v0.3.0
 [0.2.0]: https://github.com/kd-011/klipper-doctor/releases/tag/v0.2.0
 [0.1.0]: https://github.com/kd-011/klipper-doctor/releases/tag/v0.1.0

@@ -7,29 +7,29 @@
           "text": "Takes one or more files, a `klippy.log` or a `printer.cfg`, or reads stdin when given `-`.",
           "line": 14,
           "specs": [
-            "src/cli.ts:194-198",
-            "src/cli.ts:221-222"
+            "src/cli.ts:208-210",
+            "src/cli.ts:235-238"
           ],
-          "head": "600ebe239793dd6ceb8fbac47a233bebc0b317f6",
+          "head": "c6944e235163560a7857d35825150dc99a510fc0",
           "files": {
             "src/cli.ts": {
               "path": "src/cli.ts",
-              "blob": "41f1cd29453319fc800272b0121bbc2e4ca18210",
-              "commit": "6c19ac37b904fe4e6ab806c7519958c2746d7bee",
+              "blob": "ae5c9b9242ce15844003e66b3b1d53fe8d4f2362",
+              "commit": "504e53b4684cee5e29a577130cb7057cb9a62e45",
               "range": {
-                "start": 194,
-                "end": 198,
-                "hash": "61593c24f85d22af9cf2b2d6c65d93d95be8d409"
+                "start": 208,
+                "end": 210,
+                "hash": "7a344308a63bba21cb06cee90c5ba9287a6ce15a"
               }
             },
-            "src/cli.ts:221-222": {
+            "src/cli.ts:235-238": {
               "path": "src/cli.ts",
-              "blob": "41f1cd29453319fc800272b0121bbc2e4ca18210",
-              "commit": "6c19ac37b904fe4e6ab806c7519958c2746d7bee",
+              "blob": "ae5c9b9242ce15844003e66b3b1d53fe8d4f2362",
+              "commit": "504e53b4684cee5e29a577130cb7057cb9a62e45",
               "range": {
-                "start": 221,
-                "end": 222,
-                "hash": "5e256a97b3bbb2d00738986b854f25d81646a609"
+                "start": 235,
+                "end": 238,
+                "hash": "1430e7071c116df3d60bc47fa378d74c09e6791d"
               }
             }
           }
@@ -38,28 +38,28 @@
           "text": "Exits 0 when no finding is an error, 1 when at least one is, and 2 for a usage or read error.",
           "line": 15,
           "specs": [
-            "src/cli.ts:230-232",
-            "src/cli.ts:285"
+            "src/cli.ts:246-248",
+            "src/cli.ts:301"
           ],
-          "head": "600ebe239793dd6ceb8fbac47a233bebc0b317f6",
+          "head": "c6944e235163560a7857d35825150dc99a510fc0",
           "files": {
             "src/cli.ts": {
               "path": "src/cli.ts",
-              "blob": "41f1cd29453319fc800272b0121bbc2e4ca18210",
-              "commit": "6c19ac37b904fe4e6ab806c7519958c2746d7bee",
+              "blob": "ae5c9b9242ce15844003e66b3b1d53fe8d4f2362",
+              "commit": "504e53b4684cee5e29a577130cb7057cb9a62e45",
               "range": {
-                "start": 230,
-                "end": 232,
+                "start": 246,
+                "end": 248,
                 "hash": "d203925c551ab5e259380b4de0d8127858451723"
               }
             },
-            "src/cli.ts:285-285": {
+            "src/cli.ts:301-301": {
               "path": "src/cli.ts",
-              "blob": "41f1cd29453319fc800272b0121bbc2e4ca18210",
-              "commit": "6c19ac37b904fe4e6ab806c7519958c2746d7bee",
+              "blob": "ae5c9b9242ce15844003e66b3b1d53fe8d4f2362",
+              "commit": "504e53b4684cee5e29a577130cb7057cb9a62e45",
               "range": {
-                "start": 285,
-                "end": 285,
+                "start": 301,
+                "end": 301,
                 "hash": "73a4abfaec391d39b7ebba3e0d65df3118fc0671"
               }
             }
@@ -69,28 +69,28 @@
           "text": "Only the CLI touches the filesystem and the network, and it reads the files named, stdin, or one Moonraker URL.",
           "line": 16,
           "specs": [
-            "src/cli.ts:198",
-            "src/cli.ts:219-222"
+            "src/cli.ts:209",
+            "src/cli.ts:235-238"
           ],
-          "head": "600ebe239793dd6ceb8fbac47a233bebc0b317f6",
+          "head": "c6944e235163560a7857d35825150dc99a510fc0",
           "files": {
             "src/cli.ts": {
               "path": "src/cli.ts",
-              "blob": "41f1cd29453319fc800272b0121bbc2e4ca18210",
-              "commit": "6c19ac37b904fe4e6ab806c7519958c2746d7bee",
+              "blob": "ae5c9b9242ce15844003e66b3b1d53fe8d4f2362",
+              "commit": "504e53b4684cee5e29a577130cb7057cb9a62e45",
               "range": {
-                "start": 198,
-                "end": 198,
+                "start": 209,
+                "end": 209,
                 "hash": "4d9d3b3cf5dad7bcbebd4c3a5cba7e7456b847d5"
               }
             },
-            "src/cli.ts:219-222": {
+            "src/cli.ts:235-238": {
               "path": "src/cli.ts",
-              "blob": "41f1cd29453319fc800272b0121bbc2e4ca18210",
-              "commit": "6c19ac37b904fe4e6ab806c7519958c2746d7bee",
+              "blob": "ae5c9b9242ce15844003e66b3b1d53fe8d4f2362",
+              "commit": "504e53b4684cee5e29a577130cb7057cb9a62e45",
               "range": {
-                "start": 219,
-                "end": 222,
+                "start": 235,
+                "end": 238,
                 "hash": "1430e7071c116df3d60bc47fa378d74c09e6791d"
               }
             }
@@ -102,12 +102,12 @@
           "specs": [
             "CONTRIBUTING.md:19"
           ],
-          "head": "600ebe239793dd6ceb8fbac47a233bebc0b317f6",
+          "head": "c6944e235163560a7857d35825150dc99a510fc0",
           "files": {
             "CONTRIBUTING.md": {
               "path": "CONTRIBUTING.md",
-              "blob": "771b44dcfb83eeb3be0bde000dcdace294c9bb7f",
-              "commit": "6c19ac37b904fe4e6ab806c7519958c2746d7bee",
+              "blob": "9ef811c20f9608de1716b1795ae37a366b0e75ad",
+              "commit": "504e53b4684cee5e29a577130cb7057cb9a62e45",
               "range": {
                 "start": 19,
                 "end": 19,
@@ -122,12 +122,12 @@
           "specs": [
             "package.json:47-49"
           ],
-          "head": "600ebe239793dd6ceb8fbac47a233bebc0b317f6",
+          "head": "c6944e235163560a7857d35825150dc99a510fc0",
           "files": {
             "package.json": {
               "path": "package.json",
-              "blob": "dacc30b658cf18df8cee780411e7a005d62cae81",
-              "commit": "600ebe239793dd6ceb8fbac47a233bebc0b317f6",
+              "blob": "e520aa3c9f701ab6d4a01f3840791d3010865a8a",
+              "commit": "504e53b4684cee5e29a577130cb7057cb9a62e45",
               "range": {
                 "start": 47,
                 "end": 49,
@@ -142,12 +142,12 @@
           "specs": [
             "src/core/types.ts:1"
           ],
-          "head": "600ebe239793dd6ceb8fbac47a233bebc0b317f6",
+          "head": "c6944e235163560a7857d35825150dc99a510fc0",
           "files": {
             "src/core/types.ts": {
               "path": "src/core/types.ts",
               "blob": "123004711378fda97f696637c94669262b3e1b36",
-              "commit": "6c19ac37b904fe4e6ab806c7519958c2746d7bee",
+              "commit": "abdd17bef882d5d848c80b0c934e1df9bae138a8",
               "range": {
                 "start": 1,
                 "end": 1,
@@ -162,12 +162,12 @@
           "specs": [
             "src/core/types.ts:9-19"
           ],
-          "head": "600ebe239793dd6ceb8fbac47a233bebc0b317f6",
+          "head": "c6944e235163560a7857d35825150dc99a510fc0",
           "files": {
             "src/core/types.ts": {
               "path": "src/core/types.ts",
               "blob": "123004711378fda97f696637c94669262b3e1b36",
-              "commit": "6c19ac37b904fe4e6ab806c7519958c2746d7bee",
+              "commit": "abdd17bef882d5d848c80b0c934e1df9bae138a8",
               "range": {
                 "start": 9,
                 "end": 19,
@@ -182,12 +182,12 @@
           "specs": [
             "src/core/index.ts:19"
           ],
-          "head": "600ebe239793dd6ceb8fbac47a233bebc0b317f6",
+          "head": "c6944e235163560a7857d35825150dc99a510fc0",
           "files": {
             "src/core/index.ts": {
               "path": "src/core/index.ts",
-              "blob": "270490f64c5cef25cbddb35066317b14100e7876",
-              "commit": "6c19ac37b904fe4e6ab806c7519958c2746d7bee",
+              "blob": "e5959528b8fabf2904b3e9c50a33f4a5135a7772",
+              "commit": "504e53b4684cee5e29a577130cb7057cb9a62e45",
               "range": {
                 "start": 19,
                 "end": 19,
@@ -200,17 +200,17 @@
           "text": "Limits a finding's detail to 4000 characters and each evidence line to 2000, so a damaged file cannot produce a huge report.",
           "line": 22,
           "specs": [
-            "src/core/index.ts:47-53"
+            "src/core/index.ts:58-64"
           ],
-          "head": "600ebe239793dd6ceb8fbac47a233bebc0b317f6",
+          "head": "c6944e235163560a7857d35825150dc99a510fc0",
           "files": {
             "src/core/index.ts": {
               "path": "src/core/index.ts",
-              "blob": "270490f64c5cef25cbddb35066317b14100e7876",
-              "commit": "6c19ac37b904fe4e6ab806c7519958c2746d7bee",
+              "blob": "e5959528b8fabf2904b3e9c50a33f4a5135a7772",
+              "commit": "504e53b4684cee5e29a577130cb7057cb9a62e45",
               "range": {
-                "start": 47,
-                "end": 53,
+                "start": 58,
+                "end": 64,
                 "hash": "968c4e5d444ec112cedc710c28e133b36c2ab840"
               }
             }
@@ -220,17 +220,17 @@
           "text": "When a log holds several Klipper starts, analyses the last one.",
           "line": 23,
           "specs": [
-            "src/core/index.ts:257"
+            "src/core/index.ts:320"
           ],
-          "head": "600ebe239793dd6ceb8fbac47a233bebc0b317f6",
+          "head": "c6944e235163560a7857d35825150dc99a510fc0",
           "files": {
             "src/core/index.ts": {
               "path": "src/core/index.ts",
-              "blob": "270490f64c5cef25cbddb35066317b14100e7876",
-              "commit": "6c19ac37b904fe4e6ab806c7519958c2746d7bee",
+              "blob": "e5959528b8fabf2904b3e9c50a33f4a5135a7772",
+              "commit": "504e53b4684cee5e29a577130cb7057cb9a62e45",
               "range": {
-                "start": 257,
-                "end": 257,
+                "start": 320,
+                "end": 320,
                 "hash": "f79d8850de65d083bf4394c805720a10255e8e0c"
               }
             }
@@ -241,77 +241,77 @@
           "line": 27,
           "specs": [
             "src/core/index.ts:16",
-            "src/core/index.ts:320",
-            "src/core/index.ts:341"
+            "src/core/index.ts:386",
+            "src/core/index.ts:407"
           ],
-          "head": "600ebe239793dd6ceb8fbac47a233bebc0b317f6",
+          "head": "c6944e235163560a7857d35825150dc99a510fc0",
           "files": {
             "src/core/index.ts": {
               "path": "src/core/index.ts",
-              "blob": "270490f64c5cef25cbddb35066317b14100e7876",
-              "commit": "6c19ac37b904fe4e6ab806c7519958c2746d7bee",
+              "blob": "e5959528b8fabf2904b3e9c50a33f4a5135a7772",
+              "commit": "504e53b4684cee5e29a577130cb7057cb9a62e45",
               "range": {
                 "start": 16,
                 "end": 16,
                 "hash": "b3f653f033f70ba489ea0eceafafabe1cce47c58"
               }
             },
-            "src/core/index.ts:320-320": {
+            "src/core/index.ts:386-386": {
               "path": "src/core/index.ts",
-              "blob": "270490f64c5cef25cbddb35066317b14100e7876",
-              "commit": "6c19ac37b904fe4e6ab806c7519958c2746d7bee",
+              "blob": "e5959528b8fabf2904b3e9c50a33f4a5135a7772",
+              "commit": "504e53b4684cee5e29a577130cb7057cb9a62e45",
               "range": {
-                "start": 320,
-                "end": 320,
+                "start": 386,
+                "end": 386,
                 "hash": "58c10e929b397ad2b7e58719ff1e57a36f23ee15"
               }
             },
-            "src/core/index.ts:341-341": {
+            "src/core/index.ts:407-407": {
               "path": "src/core/index.ts",
-              "blob": "270490f64c5cef25cbddb35066317b14100e7876",
-              "commit": "6c19ac37b904fe4e6ab806c7519958c2746d7bee",
+              "blob": "e5959528b8fabf2904b3e9c50a33f4a5135a7772",
+              "commit": "504e53b4684cee5e29a577130cb7057cb9a62e45",
               "range": {
-                "start": 341,
-                "end": 341,
+                "start": 407,
+                "end": 407,
                 "hash": "0063fbfbe607eee0b571cbf015d1e7f773e77caa"
               }
             }
           }
         },
-        "e59c8f27d1bc": {
-          "text": "The README rule table is generated from the engine's rule metadata.",
+        "9784dacc8863": {
+          "text": "The rule table in docs/rules.md is generated from the engine's rule metadata.",
           "line": 28,
           "specs": [
-            "scripts/gen-rules-table.mjs:5-12"
+            "scripts/gen-rules-table.mjs:1-14"
           ],
-          "head": "600ebe239793dd6ceb8fbac47a233bebc0b317f6",
+          "head": "c6944e235163560a7857d35825150dc99a510fc0",
           "files": {
             "scripts/gen-rules-table.mjs": {
               "path": "scripts/gen-rules-table.mjs",
-              "blob": "14255ac1c3691a0f843956325c32379bff8332f6",
-              "commit": "55f1240d71c3184cf27cbe12da27fa7ad3d6bea0",
+              "blob": "97c55d17c97030376b571edeaf27efd4a0202700",
+              "commit": "504e53b4684cee5e29a577130cb7057cb9a62e45",
               "range": {
-                "start": 5,
-                "end": 12,
-                "hash": "bbc8349874c3fe3ae0783d07c47ff1210e995ac2"
+                "start": 1,
+                "end": 14,
+                "hash": "11f0a182879b30303cb07f95a6596d3c2ac0bd8c"
               }
             }
           }
         },
-        "7c17f4b19258": {
-          "text": "CI typechecks and tests on Node 18 and 22 for every pull request and once a week, and fails when `dist/` or the README rule table is out of date.",
+        "da69bff36550": {
+          "text": "CI typechecks and tests on Node 18 and 22 for every pull request and once a week, and fails when `dist/` or the rule table is out of date.",
           "line": 32,
           "specs": [
             ".github/workflows/ci.yml:13",
             ".github/workflows/ci.yml:28",
             ".github/workflows/ci.yml:36-41"
           ],
-          "head": "600ebe239793dd6ceb8fbac47a233bebc0b317f6",
+          "head": "c6944e235163560a7857d35825150dc99a510fc0",
           "files": {
             ".github/workflows/ci.yml": {
               "path": ".github/workflows/ci.yml",
-              "blob": "106ef95b68844009843fdec9495792a601262575",
-              "commit": "6c19ac37b904fe4e6ab806c7519958c2746d7bee",
+              "blob": "769a01fbf0b6e104be4a0c53868d4af1db95c7cc",
+              "commit": "504e53b4684cee5e29a577130cb7057cb9a62e45",
               "range": {
                 "start": 13,
                 "end": 13,
@@ -320,8 +320,8 @@
             },
             ".github/workflows/ci.yml:28-28": {
               "path": ".github/workflows/ci.yml",
-              "blob": "106ef95b68844009843fdec9495792a601262575",
-              "commit": "6c19ac37b904fe4e6ab806c7519958c2746d7bee",
+              "blob": "769a01fbf0b6e104be4a0c53868d4af1db95c7cc",
+              "commit": "504e53b4684cee5e29a577130cb7057cb9a62e45",
               "range": {
                 "start": 28,
                 "end": 28,
@@ -330,12 +330,12 @@
             },
             ".github/workflows/ci.yml:36-41": {
               "path": ".github/workflows/ci.yml",
-              "blob": "106ef95b68844009843fdec9495792a601262575",
-              "commit": "6c19ac37b904fe4e6ab806c7519958c2746d7bee",
+              "blob": "769a01fbf0b6e104be4a0c53868d4af1db95c7cc",
+              "commit": "504e53b4684cee5e29a577130cb7057cb9a62e45",
               "range": {
                 "start": 36,
                 "end": 41,
-                "hash": "64b12ab82e087a504653de3c43670faac17c3438"
+                "hash": "774890d7246157d7a6ee3e4e106c0da531314ee8"
               }
             }
           }
@@ -347,12 +347,12 @@
             ".github/workflows/publish.yml:21-24",
             ".github/workflows/publish.yml:82"
           ],
-          "head": "600ebe239793dd6ceb8fbac47a233bebc0b317f6",
+          "head": "c6944e235163560a7857d35825150dc99a510fc0",
           "files": {
             ".github/workflows/publish.yml": {
               "path": ".github/workflows/publish.yml",
-              "blob": "e3e8d3a2a617133b02319e3822387b9a459b7d28",
-              "commit": "6c19ac37b904fe4e6ab806c7519958c2746d7bee",
+              "blob": "a93826b8902c539c81997e0e7c1877665cd9aee2",
+              "commit": "504e53b4684cee5e29a577130cb7057cb9a62e45",
               "range": {
                 "start": 21,
                 "end": 24,
@@ -361,8 +361,8 @@
             },
             ".github/workflows/publish.yml:82-82": {
               "path": ".github/workflows/publish.yml",
-              "blob": "e3e8d3a2a617133b02319e3822387b9a459b7d28",
-              "commit": "6c19ac37b904fe4e6ab806c7519958c2746d7bee",
+              "blob": "a93826b8902c539c81997e0e7c1877665cd9aee2",
+              "commit": "504e53b4684cee5e29a577130cb7057cb9a62e45",
               "range": {
                 "start": 82,
                 "end": 82,
@@ -372,8 +372,8 @@
           }
         }
       },
-      "pinnedAt": "2026-11-02T15:27:31.509Z",
-      "head": "600ebe239793dd6ceb8fbac47a233bebc0b317f6"
+      "pinnedAt": "2026-11-03T07:34:33.762Z",
+      "head": "c6944e235163560a7857d35825150dc99a510fc0"
     }
   }
 }

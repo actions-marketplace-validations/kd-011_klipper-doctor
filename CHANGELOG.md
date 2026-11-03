@@ -6,6 +6,27 @@ All notable changes to this project are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-03
+
+From reading 80 help threads on the Klipper forum against the report. The method and the results are in [docs/accuracy.md](docs/accuracy.md).
+
+### Added
+- `command-error`: a line that matches a message Klipper's source raises as a command error, such as `bed_mesh: min/max points too close together`, is now named, with the source file it comes from. The list has 219 messages, generated from Klipper at commit 0cee841 by `scripts/gen-command-errors.mjs`. These used to read as no failure.
+- `mcu-version-differs`: a note when an MCU runs a different build from the host, which is what the `has deprecated code` warning is about. Builds of the same commit don't count as different.
+- `mcu-config-while-shutdown`, `mcu-reset-failed` and `mcu-thermocouple-fault`, for the three unmatched messages seen most in the forum logs.
+
+### Changed
+- When the last session is clean, a command error in an earlier session is now reported, and the no-failure finding lists what the other sessions logged.
+- An earlier session stuck on `Can not update MCU config as it is shutdown` now points back at the session that caused it.
+- A log that ends while Klipper is still retrying its connection now says so, as a warning, where it used to say no failure.
+- The README is short now. Usage, the rule table and examples moved to `docs/`, and `npm run docs` writes the rule table to `docs/rules.md`.
+
+### Fixed
+- `klipper-doctor http://host:7125` now also tries Moonraker's `logs` root when `/server/files/klippy.log` answers 404. On a real Moonraker that route answers 404 until Klipper connects, so the tool reported no log at the moment one was needed.
+- A failed connect above the first `Start printer` line of a log is now its own session. It used to merge with the next run and could hide that run's shutdown.
+- `moonraker.log` is now recognised and sent back with a pointer to `klippy.log`. Moonraker quotes Klipper's messages, so it could produce a misleading finding.
+- A missing `klippy.log` and a directory argument get a plain message that says where the log is, in place of a raw `ENOENT` or `EISDIR`.
+
 ## [0.4.0] - 2026-11-02
 
 ### Added

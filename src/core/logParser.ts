@@ -142,7 +142,9 @@ export function parseLog(lines: string[]): ParsedLog {
   // preamble or version block (no Start line, Stats or shutdown yet) stays attached to its own start.
   // This matters for a log rotated at midnight, which opens with the rollover block instead of
   // "Start printer at" (klippy/queuelogger.py doRollover).
-  const hasRuntime = () => curHasStart || cur.statsCount > 0 || cur.shutdowns.length > 0;
+  // A connect that failed counts too: a log that begins mid-run can hold one above its first Start line.
+  let curFailedConnect = false;
+  const hasRuntime = () => curHasStart || curFailedConnect || cur.statsCount > 0 || cur.shutdowns.length > 0;
 
   const close = (endLine: number) => {
     cur.endLine = endLine;
@@ -184,6 +186,7 @@ export function parseLog(lines: string[]): ParsedLog {
         close(no - 1);
         cur = newSession(sessions.length + 1, no);
         curHasStart = false;
+        curFailedConnect = false;
       }
       cur.notable.push(evidence(no, line));
       continue;
@@ -193,6 +196,7 @@ export function parseLog(lines: string[]): ParsedLog {
       if (hasRuntime()) {
         close(no - 1);
         cur = newSession(sessions.length + 1, no);
+        curFailedConnect = false;
       }
       curHasStart = true;
       starts++;
@@ -222,6 +226,8 @@ export function parseLog(lines: string[]): ParsedLog {
       if (m) cur.mcus.push({ name: m[1] as string, version: m[2] });
     } else if (line.startsWith(SHUTDOWN)) {
       cur.shutdowns.push(evidence(no, line));
+    } else if (!curHasStart && line.startsWith('MCU error during connect')) {
+      curFailedConnect = true;
     }
     cur.notable.push(evidence(no, line));
   }

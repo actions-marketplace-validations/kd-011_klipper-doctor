@@ -1,4 +1,5 @@
 import type { CrashRule } from '../types.js';
+import { commandError } from './commandError.js';
 import { configError } from './config.js';
 import { extrudeCold, extrudeCrossSection, extrudeOnlyTooLong } from './extruder.js';
 import { mustHomeFirst, moveOutOfRange, stepcompressInternal } from './gcode.js';
@@ -8,14 +9,17 @@ import {
   adcOutOfRange,
   canUuidInvalid,
   commandRequest,
+  configWhileShutdown,
   connectFailed,
   linuxBusOpen,
   lostCommunication,
   maxDuration,
   missedScheduling,
   protocolMismatch,
+  resetFailed,
   spontaneousRestart,
   stepRate,
+  thermocoupleFault,
   timerTooClose,
 } from './mcu.js';
 import { tmcComm, tmcReportsError } from './tmc.js';
@@ -25,6 +29,8 @@ export const crashRules: CrashRule[] = [
   configError,
   protocolMismatch,
   connectFailed,
+  configWhileShutdown,
+  resetFailed,
   canUuidInvalid,
   linuxBusOpen,
   lostCommunication,
@@ -33,6 +39,7 @@ export const crashRules: CrashRule[] = [
   maxDuration,
   stepRate,
   adcOutOfRange,
+  thermocoupleFault,
   commandRequest,
   spontaneousRestart,
   heaterVerify,
@@ -49,4 +56,5 @@ export const crashRules: CrashRule[] = [
   extrudeCold,
   extrudeOnlyTooLong,
   extrudeCrossSection,
+  commandError,
 ];

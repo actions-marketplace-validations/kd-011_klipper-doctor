@@ -5,6 +5,8 @@ import { KLIPPER_DOCS, KLIPPER_SRC } from '../types.js';
 //   src/generic/timer_irq.c, src/stepper.c   "Rescheduled timer in the past", "Stepper too far in past"
 //   klippy/mcu.py          invoke_shutdown("Lost communication with MCU '%s'"), "MCU '%s' spontaneous restart"
 //   klippy/serialhdl.py    _error("Unable to connect"), "Unable to open serial port: %s"
+//   klippy/mcu.py          _send_get_config "Can not update MCU '%s' config as it is shutdown", _connect "Failed automated reset of MCU '%s'"
+//   src/thermocouple.c     try_shutdown("Thermocouple reader fault")
 //   klippy/extras/error_mcu.py   the hint text for each MCU shutdown reason
 // The wording of each fix starts from the hint in error_mcu.py or the page named in `docs`.
 const ERROR_MCU = KLIPPER_SRC + 'klippy/extras/error_mcu.py';
@@ -86,6 +88,32 @@ export const lostCommunication = {
         };
     },
 };
+const CONNECT_RETRY = /^mcu '([^']+)': (?:Timeout on connect|Unable to open (?:serial |CAN )?port: .*)$/;
+/**
+ * serialhdl.py keeps retrying for 90 seconds before it logs "Unable to connect", so a log saved in that time ends on
+ * its retries. Only the last session can be in that state: a later start in the file means this one was stopped.
+ */
+function stillRetrying(ctx) {
+    // extras/statistics.py starts its Stats lines at ready, so any Stats line means the connect finished.
+    if (ctx.session.index !== ctx.sessionCount || ctx.session.statsCount > 0)
+        return null;
+    const retries = ctx.findAll(CONNECT_RETRY, 500);
+    const last = retries[retries.length - 1];
+    const name = last && CONNECT_RETRY.exec(last.text)?.[1];
+    if (!last || !name || ctx.session.mcus.some((m) => m.name === name))
+        return null;
+    const port = /Unable to open/.test(last.text);
+    const missing = /No such file or directory/.test(last.text);
+    return {
+        severity: 'warning',
+        title: `Klipper was still trying to connect to MCU '${name}' when this log ends`,
+        detail: `Klipper keeps retrying the MCU for 90 seconds before it reports "Unable to connect", and this log stops during that time, so MCU '${name}' never answered.${port ? ` The last port error was: ${last.text.replace(/^mcu '[^']*': /, '').replace(/[.]?$/, '.')}` : ''}`,
+        fix: missing
+            ? 'Run `ls /dev/serial/by-id/*` on the host and copy the name it prints into serial: under [mcu]. If nothing is listed, check the USB cable and board power.'
+            : 'Check the board is powered and plugged in, that the serial path in [mcu] matches `ls /dev/serial/by-id/*`, and that the board has Klipper firmware.',
+        evidence: [last],
+    };
+}
 export const connectFailed = {
     id: 'mcu-connect-failed',
     severity: 'error',
@@ -96,7 +124,7 @@ export const connectFailed = {
     check(ctx) {
         const hit = ctx.match(/Unable to connect\s*$/);
         if (!hit)
-            return null;
+            return stillRetrying(ctx);
         const name = /mcu '([^']+)'/.exec(hit.ev.text)?.[1] ?? 'mcu';
         const opens = ctx.findAll(/Unable to open (?:serial |CAN )?port: /, 500);
         const open = opens[opens.length - 1];
@@ -278,6 +306,59 @@ export const protocolMismatch = {
 // a non-default value only for that long without another update, "to ensure the host does not enable the heater
 // and then go off-line". docs/Config_Reference.md ([output_pin] maximum_mcu_duration) says the MCU shuts down if
 // the host can not keep up with an update.
+export const configWhileShutdown = {
+    id: 'mcu-config-while-shutdown',
+    severity: 'error',
+    title: 'MCU is still shut down from an earlier failure',
+    detail: 'Klipper tried to configure the micro-controller while it was still in its shutdown state, so it stopped at connect.',
+    fix: 'Run FIRMWARE_RESTART, as Klipper asks, so the MCU resets. RESTART alone does not clear it.',
+    docs: KLIPPER_SRC + 'klippy/mcu.py',
+    check(ctx) {
+        const hit = ctx.match(/^(?:\w+\.error: )?Can not update MCU '([^']+)' config as it is shutdown\s*$/);
+        if (!hit)
+            return null;
+        return {
+            title: `MCU '${hit.m[1]}' is still shut down from an earlier failure`,
+            detail: `MCU '${hit.m[1]}' reported that it is shut down, so Klipper could not configure it ("Can not update MCU '${hit.m[1]}' config as it is shutdown"). This is the result of an earlier shutdown, not a new fault: the cause is usually in the session before this one.`,
+            evidence: [hit.ev],
+        };
+    },
+};
+export const resetFailed = {
+    id: 'mcu-reset-failed',
+    severity: 'error',
+    title: 'FIRMWARE_RESTART did not reset the MCU',
+    detail: 'A FIRMWARE_RESTART was requested, but the micro-controller still held its old configuration afterwards, so it had not reset.',
+    fix: 'Power-cycle the board, then check restart_method in [mcu] if it happens on every FIRMWARE_RESTART.',
+    docs: KLIPPER_DOCS + 'Config_Reference.html#mcu',
+    check(ctx) {
+        const hit = ctx.match(/^(?:\w+\.error: )?Failed automated reset of MCU '([^']+)'\s*$/);
+        if (!hit)
+            return null;
+        return {
+            title: `FIRMWARE_RESTART did not reset MCU '${hit.m[1]}'`,
+            detail: `Klipper was started by a FIRMWARE_RESTART, but MCU '${hit.m[1]}' still held its old configuration, so the reset had not happened ("Failed automated reset of MCU '${hit.m[1]}'"). The restart_method option in [mcu] controls how the host resets the board.`,
+            evidence: [hit.ev],
+        };
+    },
+};
+export const thermocoupleFault = {
+    id: 'mcu-thermocouple-fault',
+    severity: 'error',
+    title: 'Thermocouple reader fault',
+    detail: 'The micro-controller shut down after its thermocouple amplifier reported a fault, or a value outside the allowed range, on too many reads in a row.',
+    fix: 'Check the thermocouple and its connection to the amplifier board, the SPI wiring, and sensor_type and sensor_pin in the config. Then run FIRMWARE_RESTART.',
+    docs: KLIPPER_SRC + 'src/thermocouple.c',
+    check(ctx) {
+        const c = mcuCause(ctx, 'Thermocouple reader fault');
+        if (!c)
+            return null;
+        return {
+            ...aboutCause(c, `MCU '${c.mcu}' shut down with "Thermocouple reader fault": its thermocouple amplifier (MAX31855, MAX31856, MAX31865 or MAX6675) reported a fault, or a value outside the allowed range, on too many reads in a row.`, 'Check the thermocouple and its connection to the amplifier board, the SPI wiring, and sensor_type and sensor_pin in the config. Then run FIRMWARE_RESTART.'),
+            evidence: uniq([c.ev, ctx.shutdown]),
+        };
+    },
+};
 export const maxDuration = {
     id: 'mcu-max-duration',
     severity: 'error',

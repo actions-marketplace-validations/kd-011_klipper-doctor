@@ -28,6 +28,17 @@ const noConfigDumpMeta: RuleMeta = {
   docs: KLIPPER_SRC + 'klippy/configfile.py',
 };
 
+// extras/error_mcu.py and klippy/configfile.py deprecate_mcu_code name the MCU and host versions in their messages.
+const mcuVersionMeta: RuleMeta = {
+  id: 'mcu-version-differs',
+  severity: 'note',
+  title: 'MCU firmware is a different version from the host',
+  detail:
+    'A micro-controller runs a different build of Klipper from the host. That is normal when only the host software was updated. The Klipper FAQ says to reflash when the software asks for it.',
+  fix: 'If Klipper warns about it, recompile and flash the firmware, then run FIRMWARE_RESTART.',
+  docs: KLIPPER_DOCS + 'FAQ.html#how-do-i-upgrade-to-the-latest-software',
+};
+
 const unusableInputMeta: RuleMeta = {
   id: 'unusable-input',
   severity: 'error',
@@ -118,6 +129,7 @@ function makeCrashContext(
     sessionCount,
     config,
     notable,
+    causal,
     cause,
     shutdown: session.shutdowns[0],
     match,
@@ -145,17 +157,58 @@ function runCrashRules(ctx: CrashContext): Finding[] {
   return crash;
 }
 
-/** The latest session before the last one that failed, with what the rules make of it. */
+/**
+ * The latest session before the last one that failed, with what the rules make of it. With no failed
+ * session, the latest one with a command error that a rule knows, which can be what stopped a print.
+ * What the other sessions logged goes along with it, so a problem that keeps coming back is visible.
+ */
 function findEarlierFailure(parsed: ParsedLog): EarlierFailure | undefined {
+  const seen: EarlierFailure[] = [];
+  let failed: EarlierFailure | undefined;
+  let commandError: EarlierFailure | undefined;
   for (let i = parsed.sessions.length - 2; i >= 0; i--) {
     const session = parsed.sessions[i] as LogSession;
     const ctx = makeCrashContext(session, parsed.sessions.length, undefined);
-    if (failureEvidence(ctx).length === 0) continue;
-    const unknown = unknownReason(ctx);
-    const finding = runCrashRules(ctx).find((f) => f.severity === 'error') ?? (unknown ? toFinding(unknownReasonMeta, unknown) : undefined);
-    if (finding) return { index: session.index, finding };
+    const found = runCrashRules(ctx);
+    let finding = found.find((f) => f.severity === 'warning');
+    if (failureEvidence(ctx).length > 0) {
+      const unknown = unknownReason(ctx);
+      finding = found.find((f) => f.severity === 'error') ?? (unknown ? toFinding(unknownReasonMeta, unknown) : finding);
+    }
+    if (!finding) continue;
+    const entry = { index: session.index, finding };
+    seen.push(entry);
+    if (finding.severity === 'warning') commandError ??= entry;
+    // That message means an earlier shutdown was not cleared, so the session before it has the cause.
+    else if (!failed || failed.finding.id === 'mcu-config-while-shutdown') failed = entry;
   }
-  return undefined;
+  const chosen = failed ?? commandError;
+  if (!chosen) return undefined;
+  const counts = new Map<string, number>();
+  for (const e of seen) if (e !== chosen) counts.set(e.finding.title, (counts.get(e.finding.title) ?? 0) + 1);
+  return { ...chosen, others: [...counts].slice(0, 4).map(([title, n]) => `${title} (${n} session${n === 1 ? '' : 's'})`) };
+}
+
+/** The same commit, however the build named it: git describe abbreviates to any length, and a dirty tree adds to it. */
+function sameBuild(a: string, b: string): boolean {
+  const DESCRIBE = /^(v?\d[\d.]*-\d+-g)([0-9a-f]+)/;
+  const x = DESCRIBE.exec(a);
+  const y = DESCRIBE.exec(b);
+  if (!x || !y) return a.replace(/-dirty.*$/, '') === b.replace(/-dirty.*$/, '');
+  return x[1] === y[1] && ((x[2] as string).startsWith(y[2] as string) || (y[2] as string).startsWith(x[2] as string));
+}
+
+function mcuVersionFinding(session: LogSession): Finding | undefined {
+  const host = session.klipperVersion;
+  if (!host) return undefined;
+  const byName = new Map(session.mcus.map((m) => [m.name, m.version]));
+  const differ = [...byName].filter(([, v]) => v && !sameBuild(v, host));
+  if (differ.length === 0) return undefined;
+  const list = differ.slice(0, 6).map(([name, v]) => `'${name}' runs ${v}`).join(', ');
+  return toFinding(mcuVersionMeta, {
+    detail: `The host runs ${host}, and ${list}. That is normal when only the host software was updated, and the Klipper FAQ says to reflash when the software asks for it, such as a warning that an MCU "has deprecated code" or a protocol error.`,
+    evidence: [],
+  });
 }
 
 /** A BOM, and the NUL bytes of a power loss or of a UTF-16 file read as UTF-8, get in the way of every match. */
@@ -205,6 +258,16 @@ function analyzeText(input: string, filename: string | undefined, ignore: Set<st
       title: 'The file is empty',
       detail: 'There is no text to check. If this is a klippy.log, Klipper may not have started since the log was cleared, or the copy was cut short.',
       fix: 'Check the file, and copy it again if it should have text in it.',
+      evidence: [],
+    });
+  }
+
+  // Moonraker's log sits next to klippy.log and quotes Klipper's messages, so it is easy to pick up by mistake.
+  if (/^-{10,} Log Start \| /.test(lines[0] ?? '')) {
+    return unusable(namedKind, lines.length, {
+      title: "This is Moonraker's log, not klippy.log",
+      detail: "This file starts the way Moonraker's own log does. Moonraker quotes some of Klipper's messages, so reading it would give wrong answers.",
+      fix: 'Use klippy.log, which is in the same folder (printer_data/logs).',
       evidence: [],
     });
   }
@@ -280,6 +343,9 @@ function analyzeText(input: string, filename: string | undefined, ignore: Set<st
     })];
   }
 
+  const stale = mcuVersionFinding(session);
+  if (stale) config.push(stale);
+
   const ctx = makeCrashContext(session, parsed.sessions.length, cfg);
   const crash = runCrashRules(ctx);
   // Only an error-level finding explains a Klipper failure. Warning-level findings (gcode command
@@ -348,6 +414,7 @@ export function rulesMetadata(): RuleInfo[] {
     crash(noFailureMeta),
     ...configRules.map((r) => config(strip(r))),
     config(noConfigDumpMeta),
+    config(mcuVersionMeta),
     config(unusableInputMeta),
   ];
 }

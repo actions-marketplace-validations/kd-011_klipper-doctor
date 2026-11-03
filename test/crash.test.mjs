@@ -47,7 +47,8 @@ const EXPECTED = {
   'tmc-init-then-timer.log': ['mcu-timer-too-close'],
   'tmc-all-ones.log': ['tmc-reports-error'],
   'tmc-cs-actual-reset.log': ['tmc-reports-error'],
-  'connect-mcu-already-shutdown.log': ['crash-unknown-reason'],
+  'connect-mcu-already-shutdown.log': ['mcu-config-while-shutdown'],
+  'connect-crc-mismatch.log': ['crash-unknown-reason'],
   'connect-unhandled.log': ['crash-unknown-reason'],
   'previous-mcu-shutdown.log': ['mcu-adc-out-of-range'],
   'rollover-real-order.log': ['mcu-timer-too-close'],
@@ -244,8 +245,8 @@ test('Command request after a heater shutdown is the effect, not a second diagno
 
 test('an MCU reason no rule knows is shown, not hidden behind Command request', () => {
   const f = analyze(fixture('mcu-fault-then-command-request.log')).crash[0];
-  assert.match(f.title, /MCU 'mcu' shutdown: Thermocouple reader fault/);
-  assert.ok(f.evidence.some((e) => /Thermocouple reader fault/.test(e.text)));
+  assert.match(f.title, /MCU 'mcu' shutdown: Some future firmware reason/);
+  assert.ok(f.evidence.some((e) => /Some future firmware reason/.test(e.text)));
 });
 
 test('the MCU named in a finding is the one that gave the reason, not the first one listed', () => {
@@ -369,10 +370,10 @@ test('se=0(Reset?) from a tmc2660 reads as a driver reset', () => {
 // ---- The rest of the fallback and the MCU rules ----
 
 test('MCU error during connect shows the message from the traceback and what to do next', () => {
-  const f = analyze(fixture('connect-mcu-already-shutdown.log')).crash[0];
-  assert.match(f.title, /Can not update MCU 'mcu' config as it is shutdown/);
+  const f = analyze(fixture('connect-crc-mismatch.log')).crash[0];
+  assert.match(f.title, /MCU 'mcu' CRC does not match config/);
   assert.match(f.fix, /FIRMWARE_RESTART/);
-  assert.ok(f.evidence.some((e) => /Can not update/.test(e.text)));
+  assert.ok(f.evidence.some((e) => /CRC does not match/.test(e.text)));
 });
 
 test('Unhandled exception during connect shows the exception', () => {

@@ -111,7 +111,7 @@ Dumping send queue 3 messages
 Send: 4 1793.5 1793.5 7: seq: 1c, queue_step oid=2 interval=4000 count=10 add=0
 Dumping receive queue 2 messages
 Receive: 0 5410.2 5410.2 5: seq: 1d, status clock=1234567 status_clock=1234500
-MCU 'mcu' shutdown: Thermocouple reader fault
+MCU 'mcu' shutdown: Some future firmware reason
 Dumping serial stats: bytes_write=2400 bytes_read=3100 bytes_retransmit=2 bytes_invalid=0 send_seq=140 receive_seq=140 retransmit_seq=1 srtt=0.002 rttvar=0.000 rto=0.025 ready_bytes=0 upcoming_bytes=0
 Dumping send queue 3 messages
 Send: 4 1793.5 1793.5 7: seq: 1c, queue_step oid=2 interval=4000 count=10 add=0

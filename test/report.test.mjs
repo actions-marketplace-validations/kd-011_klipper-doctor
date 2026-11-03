@@ -64,12 +64,12 @@ test('the core imports nothing from Node and touches no Node or browser globals'
   }
 });
 
-test('README rule table matches the rule metadata (run `npm run docs` to refresh it)', () => {
-  const readme = readFileSync(join(root, 'README.md'), 'utf8');
-  const m = readme.match(/<!-- rules:start -->\n([\s\S]*?)\n<!-- rules:end -->/);
-  assert.ok(m, 'README is missing the rules markers');
+test('the rule table in docs/rules.md matches the rule metadata (run `npm run docs` to refresh it)', () => {
+  const page = readFileSync(join(root, 'docs', 'rules.md'), 'utf8');
+  const m = page.match(/<!-- rules:start -->\n([\s\S]*?)\n<!-- rules:end -->/);
+  assert.ok(m, 'docs/rules.md is missing the rules markers');
   const rows = rulesMetadata().map((x) => `| \`${x.id}\` | ${x.kind} | ${x.severity} | ${x.title} | [docs](${x.docs}) |`);
-  for (const row of rows) assert.ok(m[1].includes(row), `README table is stale: ${row}`);
+  for (const row of rows) assert.ok(m[1].includes(row), `docs/rules.md is stale: ${row}`);
 });
 
 test('VERSION matches package.json', async () => {
@@ -79,6 +79,6 @@ test('VERSION matches package.json', async () => {
 });
 
 test('no copy in the repo uses an em dash or an en dash', () => {
-  const files = ['README.md', ...readdirSync(join(root, 'src', 'core', 'rules', 'crash')).map((f) => `src/core/rules/crash/${f}`), ...readdirSync(join(root, 'src', 'core', 'rules', 'config')).map((f) => `src/core/rules/config/${f}`)];
+  const files = ['README.md', 'docs/usage.md', 'docs/rules.md', 'docs/examples.md', 'docs/accuracy.md', ...readdirSync(join(root, 'src', 'core', 'rules', 'crash')).map((f) => `src/core/rules/crash/${f}`), ...readdirSync(join(root, 'src', 'core', 'rules', 'config')).map((f) => `src/core/rules/config/${f}`)];
   for (const f of files) assert.ok(!/[—–]/.test(readFileSync(join(root, f), 'utf8')), f);
 });

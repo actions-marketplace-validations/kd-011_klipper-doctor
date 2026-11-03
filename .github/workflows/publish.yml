@@ -55,7 +55,7 @@ jobs:
         run: npm run check
       - if: steps.plan.outputs.publish == 'true'
         run: npm test
-      - name: README rule table is up to date
+      - name: Rule table is up to date
         if: steps.plan.outputs.publish == 'true'
         run: node scripts/gen-rules-table.mjs --check
       - name: dist is up to date

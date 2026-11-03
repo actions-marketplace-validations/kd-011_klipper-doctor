@@ -93,7 +93,7 @@ test('ci: weekly schedule, and the matrix names match the ruleset', () => {
   assert.match(ci, /schedule:\s*\n\s+- cron:/);
   assert.match(ci, /name: npm test \(\$\{\{ matrix\.os \}\}, node \$\{\{ matrix\.node \}\}\)/);
   assert.match(ci, /dist is up to date/, 'the dist check stays');
-  assert.match(ci, /README rule table is up to date/, 'the README table check stays');
+  assert.match(ci, /Rule table is up to date/, 'the rule table check stays');
   const os = ci.match(/os: \[([^\]]+)\]/)[1].split(',').map((s) => s.trim());
   const node = ci.match(/node: \[([^\]]+)\]/)[1].split(',').map((s) => s.trim());
   const names = os.flatMap((o) => node.map((n) => `npm test (${o}, node ${n})`)).sort();

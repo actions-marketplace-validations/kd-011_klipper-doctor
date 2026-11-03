@@ -380,7 +380,7 @@ add('heater-then-command-request.log', 'A heater shutdown. The host stops the MC
   session(goodRun(5010, 2) + `\nHeater extruder not heating at expected rate\n${hostShutdown('Heater extruder not heating at expected rate')}\nMCU 'mcu' shutdown: Command request\n${serialDump}`));
 
 add('mcu-fault-then-command-request.log', 'An MCU reason no rule knows, with the second MCU reporting Command request first (current log format)', 'src/thermocouple.c, mcu.py _analyze_shutdown, extras/error_mcu.py',
-  session(goodRun(5010, 2) + `\nTransition to shutdown state: MCU shutdown\nDumping gcode input 0 blocks\nMCU 'rpi' shutdown: Command request\n${serialDump}\nMCU 'mcu' shutdown: Thermocouple reader fault\n${serialDump}${FIRMWARE_RESTART_TAIL}`));
+  session(goodRun(5010, 2) + `\nTransition to shutdown state: MCU shutdown\nDumping gcode input 0 blocks\nMCU 'rpi' shutdown: Command request\n${serialDump}\nMCU 'mcu' shutdown: Some future firmware reason\n${serialDump}${FIRMWARE_RESTART_TAIL}`));
 
 add('timer-on-second-mcu.log', 'Timer too close on the main MCU, listed after an MCU with no reason and one reporting Command request', 'src/sched.c, mcu.py _analyze_shutdown',
   session(goodRun(5010, 2) + `\nTransition to shutdown state: MCU shutdown\nDumping gcode input 0 blocks\nMCU 'toolhead' shutdown: \n${serialDump}\nMCU 'rpi' shutdown: Command request\n${serialDump}\nMCU 'mcu' shutdown: Timer too close\n${HINT_TIMER}${FIRMWARE_RESTART_TAIL}`));
@@ -423,6 +423,8 @@ add('tmc-cs-actual-reset.log', 'A TMC driver reset, in the lowercase field name 
 
 add('connect-mcu-already-shutdown.log', 'MCU error during connect where the reason is only in the traceback', 'klippy.py _connect, mcu.py',
   session(`MCU error during connect\nTraceback (most recent call last):\n  File "/home/pi/klipper/klippy/klippy.py", line 135, in _connect\n    cb()\nmcu.error: Can not update MCU 'mcu' config as it is shutdown\nCan not update MCU 'mcu' config as it is shutdown\n\nOnce the underlying issue is corrected, use the\n"FIRMWARE_RESTART" command to reset the firmware, reload the\nconfig, and restart the host software.\nError configuring printer`, { mcu: false }));
+add('connect-crc-mismatch.log', 'MCU error during connect with a message no rule knows, where the reason is only in the traceback', 'klippy.py _connect, mcu.py',
+  session(`MCU error during connect\nTraceback (most recent call last):\n  File "/home/pi/klipper/klippy/klippy.py", line 135, in _connect\n    cb()\nmcu.error: MCU 'mcu' CRC does not match config\nMCU 'mcu' CRC does not match config\n\nOnce the underlying issue is corrected, use the\n"FIRMWARE_RESTART" command to reset the firmware, reload the\nconfig, and restart the host software.\nError configuring printer`, { mcu: false }));
 
 add('connect-unhandled.log', 'Unhandled exception during connect with an ImportError on the last traceback line', 'klippy.py _connect',
   session(`Unhandled exception during connect\nTraceback (most recent call last):\n  File "/home/pi/klipper/klippy/klippy.py", line 135, in _connect\n    cb()\nImportError: cannot import name 'soft_unicode' from 'markupsafe'`, { mcu: false }));
@@ -505,6 +507,40 @@ add('command-errors-midline.log', 'A healthy session where the new command error
 
 add('probe-healthy.log', 'A healthy session whose probe and homing lines are all normal info output', 'extras/probe.py, extras/homing.py',
   session(goodRun(5010, 3) + `\nprobe at 100.000,100.000 is z=1.512500\nprobe at 100.000,100.000 is z=1.510000\nprobe: open\nEndstop x is now at 0.000\n` + goodRun(5020, 2)));
+
+// Command errors a rule has no special advice for: each is raised in the Klipper source named in src.
+commandError({ file: 'command-error-bed-mesh.log', title: 'A command error from the Klipper source that no specific rule knows', src: 'extras/bed_mesh.py generate_points' }, 'bed_mesh: min/max points too close together');
+add('command-error-many.log', 'Several command errors in a session, one of them repeated by a macro: the last is what stopped things', 'extras/bed_mesh.py, extras/virtual_sdcard.py, extras/probe.py',
+  session(goodRun(5010, 3) + `\nMust home before probe\n` + goodRun(5020, 1) + `\nbed_mesh: min/max points too close together\n` + goodRun(5030, 1) + `\nSDCARD_RESET_FILE cannot be run from the sdcard\nSDCARD_RESET_FILE cannot be run from the sdcard\n` + goodRun(5040, 1)));
+add('command-error-near-miss.log', 'A healthy session whose lines only look like command errors: quoted in a request dump, in the middle of a line, or in a macro message', 'none, a near miss for command-error',
+  session(goodRun(5010, 3) + `\nRead 5014.1: 'bed_mesh: min/max points too close together\\n'\nmy macro said: Must home before probe\n  Must home before probe\n` + goodRun(5020, 1)));
+add('command-error-before-shutdown.log', 'A command error, then a shutdown, then the same kind of error as a consequence of the shutdown', 'extras/bed_mesh.py, extras/homing.py',
+  session(goodRun(5010, 3) + `\nbed_mesh: min/max points too close together\n` + `\nTimeout with MCU 'mcu' (eventtime=5014.912345)\n${hostShutdown("Lost communication with MCU 'mcu'")}\nMust home before probe\n`));
+
+// MCU errors at connect, from klippy/mcu.py _send_get_config and _connect, as logged by klippy/klippy.py.
+const connectError = (msg) => `MCU error during connect\nTraceback (most recent call last):\n  File "/home/pi/klipper/klippy/klippy.py", line 131, in _connect\n    self.send_event("klippy:mcu_identify")\nmsgproto.error: ${msg}\n\nDuring handling of the above exception, another exception occurred:\n\nTraceback (most recent call last):\n  File "/home/pi/klipper/klippy/klippy.py", line 145, in _connect\nmcu.error: ${msg}\n${msg}\nOnce the underlying issue is corrected, use the\n"FIRMWARE_RESTART" command to reset the firmware, reload the\nconfig, and restart the host software.\nError configuring printer\n`;
+add('mcu-config-shutdown.log', "MCU error during connect: Can not update MCU 'mcu' config as it is shutdown", 'mcu.py _send_get_config',
+  session(connectError("Can not update MCU 'mcu' config as it is shutdown")));
+add('mcu-reset-failed.log', "MCU error during connect: Failed automated reset of MCU 'mcu'", 'mcu.py _connect',
+  session(connectError("Failed automated reset of MCU 'mcu'")));
+add('shutdown-then-config-shutdown.log', "A Timer too close shutdown, a RESTART that hits Can not update MCU config, then a clean session", 'extras/error_mcu.py, mcu.py _send_get_config',
+  session(goodRun(5010, 2) + '\n' + mcuShutdown('Timer too close', HINT_TIMER), { mono: 5000.0 }) +
+  `Restarting printer\n` + session(connectError("Can not update MCU 'mcu' config as it is shutdown"), { mono: 6000.0, preamble: false, t: 'Sun Nov  1 11:00:00 2026' }) +
+  `Restarting printer\n` + session(goodRun(7010, 5), { mono: 7000.0, preamble: false, t: 'Sun Nov  1 12:00:00 2026' }));
+add('thermocouple-fault.log', 'MCU shutdown: Thermocouple reader fault', 'src/thermocouple.c',
+  session(goodRun(5010, 3) + `\nTransition to shutdown state: MCU shutdown\nMCU 'mcu' shutdown: Thermocouple reader fault${FIRMWARE_RESTART_TAIL}\n${serialDump}`));
+
+// serialhdl.py: Klipper retries for 90 seconds, so a log saved in that time has no "Unable to connect" line yet.
+const retrying = (mcu) => `mcu '${mcu}': Starting serial connect\nmcu '${mcu}': Timeout on connect\nmcu '${mcu}': Wait for identify_response\nmcu '${mcu}': Timeout on connect\nmcu '${mcu}': Wait for identify_response\n`;
+add('connect-still-retrying.log', 'A log saved while Klipper was still retrying its connection to the MCU', 'serialhdl.py _get_identify_data',
+  session(retrying('mcu'), { mcu: false }));
+add('connect-still-retrying-port.log', 'A log saved while Klipper was still retrying a serial port that does not exist', 'serialhdl.py connect_uart',
+  session(`mcu 'mcu': Starting serial connect\nmcu 'mcu': Unable to open serial port: [Errno 2] could not open port /dev/serial/by-id/usb-Klipper-if00: No such file or directory\n`, { mcu: false }));
+add('connect-retried-then-ok.log', 'One retry at startup, then the MCU answered and the session ran', 'serialhdl.py, mcu.py',
+  session(goodRun(5010, 2), { preamble: true }).replace('Start printer', `mcu 'mcu': Timeout on connect\nStart printer`));
+add('log-starts-with-failed-connect.log', 'A log that begins mid-run with a failed connect and no Start printer line, then a real run that dies with Timer too close, then a clean run', 'queuelogger.py doRollover, klippy.py _connect',
+  connectError("mcu 'mcu': Unable to connect") + session(goodRun(5010, 2) + '\n' + mcuShutdown('Timer too close', HINT_TIMER), { mono: 5000.0 }) +
+  `Restarting printer\n` + session(goodRun(7010, 5), { mono: 7000.0, preamble: false, t: 'Sun Nov  1 12:00:00 2026' }));
 
 // MCU shutdown reasons from the C source. error_mcu.py has no hint for these, so there is no hint block.
 const mcuShutdownOn = (mcu, reason) => `Transition to shutdown state: MCU shutdown\nMCU '${mcu}' shutdown: ${reason}${FIRMWARE_RESTART_TAIL}\n${serialDump}`;

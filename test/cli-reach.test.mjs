@@ -192,6 +192,30 @@ test('a host name that does not exist gives the same kind of error', async () =>
   assert.match(r.stderr, /could not reach/i);
 });
 
+// Real Moonraker (b559b9a) with Klipper not running: /server/files/klippy.log is its fallback route and points
+// at /tmp/klippy.log until Klippy connects, so it answers 404 while logs/klippy.log answers 200.
+test('falls back to the logs root when the klippy.log route answers 404, sending the key to both', async () => {
+  const seen = [];
+  const s = await stub((req, res) => {
+    seen.push([req.url, req.headers['x-api-key']]);
+    if (req.url === '/server/files/logs/klippy.log') res.end(fixture('timer-too-close.log'));
+    else { res.statusCode = 404; res.end('{}'); }
+  });
+  const r = await runAsync(['--json', '--api-key', s.url], { MOONRAKER_API_KEY: 'k' });
+  await close(s);
+  assert.equal(r.status, 1, r.stderr);
+  assert.equal(JSON.parse(r.stdout).crash[0].id, 'mcu-timer-too-close');
+  assert.deepEqual(seen, [['/server/files/klippy.log', 'k'], ['/server/files/logs/klippy.log', 'k']]);
+});
+
+test('the first route still wins when it answers, with no second request', async () => {
+  const seen = [];
+  const s = await stub((req, res) => { seen.push(req.url); res.end(fixture('timer-too-close.log')); });
+  await runAsync(['--json', s.url]);
+  await close(s);
+  assert.deepEqual(seen, ['/server/files/klippy.log']);
+});
+
 test('404 says Moonraker has no klippy.log to give', async () => {
   const s = await stub((req, res) => { res.statusCode = 404; res.end('{}'); });
   const r = await runAsync([s.url]);

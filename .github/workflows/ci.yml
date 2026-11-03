@@ -37,7 +37,7 @@ jobs:
       - run: npm test
       - name: dist is up to date
         run: git diff --exit-code dist
-      - name: README rule table is up to date
+      - name: Rule table is up to date
         run: node scripts/gen-rules-table.mjs --check
 
   # The composite action in this repo, called by local path: a clean config must pass,

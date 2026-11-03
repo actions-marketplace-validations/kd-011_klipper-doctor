@@ -9,5 +9,7 @@ export declare function unknownReason(ctx: CrashContext): Hit | null;
 export interface EarlierFailure {
     index: number;
     finding: Finding;
+    /** What other earlier sessions logged, most recent first, with how many sessions logged each. */
+    others?: string[];
 }
 export declare function noFailure(ctx: CrashContext, earlier: EarlierFailure | undefined, recognised: boolean): Hit;

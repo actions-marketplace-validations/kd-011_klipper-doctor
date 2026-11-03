@@ -10,7 +10,11 @@ import { DEFAULT_KEY_VAR, FORMATS, SHELLS, USAGE, helpText } from './options.js'
 type Format = (typeof FORMATS)[number];
 
 const DEFAULT_TIMEOUT_SECONDS = 30;
+// Moonraker's docs call this route a fallback: until Klippy connects it points at /tmp/klippy.log, so it can
+// answer 404 when Klipper is down, which is when the log matters. The logs root has the file either way.
 const MOONRAKER_LOG_PATH = '/server/files/klippy.log';
+const MOONRAKER_LOGS_ROOT_PATH = '/server/files/logs/klippy.log';
+const SAMPLE_LOG = 'https://raw.githubusercontent.com/kd-011/klipper-doctor/main/test/fixtures/demo.log';
 const isUrl = (s: string) => /^https?:\/\//i.test(s);
 
 function fail(message: string): never {
@@ -129,7 +133,7 @@ function describeNetworkError(e: unknown, seconds: number): string {
   return (code && CAUSES[code]) || cause?.message || (e instanceof Error ? e.message : String(e));
 }
 
-/** Moonraker's file API: GET /server/files/klippy.log (docs: external_api/file_manager, "Download klippy.log"). */
+/** Moonraker's file API (docs: external_api/file_manager, "Download klippy.log"). */
 async function fetchKlippyLog(arg: string, apiKey: string | undefined, seconds: number): Promise<string> {
   let url: URL;
   try {
@@ -145,19 +149,22 @@ async function fetchKlippyLog(arg: string, apiKey: string | undefined, seconds: 
   const target = url.origin + prefix + MOONRAKER_LOG_PATH;
   const headers: Record<string, string> = apiKey ? { 'X-Api-Key': apiKey } : {};
 
-  let status: number;
+  let status = 0;
   let statusText = '';
   let location: string | null = null;
   let body = '';
-  try {
-    // A redirect is not followed: a custom header such as X-Api-Key would go to wherever it points.
-    const res = await fetch(target, { headers, redirect: 'manual', signal: AbortSignal.timeout(seconds * 1000) });
-    status = res.type === 'opaqueredirect' ? 302 : res.status;
-    statusText = res.statusText;
-    location = res.headers.get('location');
-    if (res.ok) body = await res.text();
-  } catch (e) {
-    fail(`could not reach ${shown}: ${describeNetworkError(e, seconds)}.`);
+  for (const path of [MOONRAKER_LOG_PATH, MOONRAKER_LOGS_ROOT_PATH]) {
+    try {
+      // A redirect is not followed: a custom header such as X-Api-Key would go to wherever it points.
+      const res = await fetch(url.origin + prefix + path, { headers, redirect: 'manual', signal: AbortSignal.timeout(seconds * 1000) });
+      status = res.type === 'opaqueredirect' ? 302 : res.status;
+      statusText = res.statusText;
+      location = res.headers.get('location');
+      if (res.ok) body = await res.text();
+    } catch (e) {
+      fail(`could not reach ${shown}: ${describeNetworkError(e, seconds)}.`);
+    }
+    if (status !== 404) break;
   }
 
   if (status >= 200 && status < 300) return body;
@@ -179,7 +186,7 @@ async function fetchKlippyLog(arg: string, apiKey: string | undefined, seconds: 
     );
   }
   if (status === 404) {
-    fail(`${shown} answered 404 for ${MOONRAKER_LOG_PATH}, so it has no klippy.log to give. Check that the address is Moonraker itself (port 7125 unless changed), not a web page in front of it that does not pass /server through.`);
+    fail(`${shown} answered 404 for ${MOONRAKER_LOG_PATH} and ${MOONRAKER_LOGS_ROOT_PATH}, so it has no klippy.log to give. Check that the address is Moonraker itself (port 7125 unless changed), not a web page in front of it that does not pass /server through.`);
   }
   fail(`${shown} answered HTTP ${status}${statusText ? ' ' + statusText : ''} for ${MOONRAKER_LOG_PATH}.`);
 }
@@ -193,21 +200,30 @@ interface Source {
   filename?: string;
 }
 
+/** The first thing most people type, on a machine that does not have the log yet. */
+const WHERE_THE_LOG_IS =
+  'klippy.log is on the printer host, in ~/printer_data/logs. Download it from Mainsail or Fluidd, which list it under their log files, or let klipper-doctor fetch it through Moonraker: klipper-doctor http://your-printer:7125';
+
 function readFile(file: string): Source {
   try {
     return { file, label: file, text: readFileSync(file === '-' ? 0 : file, 'utf8'), filename: file };
   } catch (e) {
+    const code = (e as NodeJS.ErrnoException).code;
     const message = e instanceof Error ? e.message : String(e);
+    if (code === 'EISDIR') fail(`${file} is a directory. Give it a klippy.log or a printer.cfg.`);
     // Common under WSL and over ssh: a path copied from Windows Explorer.
     const windows = process.platform !== 'win32' && /^(?:[A-Za-z]:[\\/]|\\\\)/.test(file);
     // "voron.local:7125" is read as a file name.
     const host = /^[A-Za-z0-9.-]+:\d{2,5}$/.test(file);
+    const missing = code === 'ENOENT' ? `no such file: ${file}` : message;
     fail(
       windows
-        ? `${message}\nThat looks like a Windows path. Under WSL the C: drive is /mnt/c, and a host reached over ssh has its own paths.`
+        ? `${missing}\nThat looks like a Windows path. Under WSL the C: drive is /mnt/c, and a host reached over ssh has its own paths.`
         : host
-          ? `${message}\nIf that is a Moonraker address, give the whole URL: http://${file}`
-          : message,
+          ? `${missing}\nIf that is a Moonraker address, give the whole URL: http://${file}`
+          : code === 'ENOENT' && /klippy[^/\\]*$/i.test(file)
+            ? `${missing}\n${WHERE_THE_LOG_IS}`
+            : missing,
     );
   }
 }
@@ -250,7 +266,7 @@ async function main(argv: string[]): Promise<number> {
   if (o.inputs.length === 0) {
     const fallback = join(homedir(), 'printer_data', 'logs', 'klippy.log');
     if (!existsSync(fallback)) {
-      usageFail(`no file given, and ${fallback} does not exist.`);
+      usageFail(`no file given, and ${fallback} does not exist.\n${WHERE_THE_LOG_IS}\nTo see what a report looks like: curl -s ${SAMPLE_LOG} | klipper-doctor -`);
     }
     process.stderr.write(`klipper-doctor: no file given, using ${fallback}\n`);
     o.inputs.push(fallback);

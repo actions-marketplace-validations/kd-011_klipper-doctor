@@ -76,13 +76,26 @@ export function noFailure(ctx, earlier, recognised) {
         ran = `wrote ${s.statsCount} Stats lines`;
     else
         ran = 'wrote no Stats lines';
+    const others = earlier?.others?.length ? ` Other sessions in this file logged: ${earlier.others.join(', ')}.` : '';
+    if (earlier?.finding.severity === 'warning') {
+        // A command error leaves Klipper running, so it is not a failed session, but it can be what stopped a print.
+        const f = earlier.finding;
+        return {
+            severity: 'note',
+            title: `No failure in the last session, but session ${earlier.index} of ${ctx.sessionCount} had a command error: ${f.title}`,
+            detail: `In the last session ${who} ${ran} and logged no failure. A command failed in an earlier session, which can stop a print, and it may be what you are after. It may already be fixed. Session ${earlier.index}: ${f.detail}${others}`,
+            fix: f.fix,
+            docs: f.docs,
+            evidence: f.evidence,
+        };
+    }
     if (earlier) {
         const f = earlier.finding;
         return {
             // Somebody choosing to stop the printer is worth saying, but it is not a fault to chase.
             severity: f.id === 'mcu-command-request' ? 'note' : 'warning',
             title: `No failure in the last session, but session ${earlier.index} of ${ctx.sessionCount} failed: ${f.title}`,
-            detail: `In the last session ${who} ${ran} and logged no failure. Klipper was restarted after an earlier session failed, and that session is probably the one you are after. It may already be fixed. Session ${earlier.index}: ${f.detail}`,
+            detail: `In the last session ${who} ${ran} and logged no failure. Klipper was restarted after an earlier session failed, and that session is probably the one you are after. It may already be fixed. Session ${earlier.index}: ${f.detail}${others}`,
             fix: f.fix,
             docs: f.docs,
             evidence: f.evidence,

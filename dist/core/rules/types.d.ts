@@ -33,6 +33,8 @@ export interface CrashContext {
     config?: ParsedConfig;
     /** Non-Stats lines of the session, with their line numbers. */
     notable: Evidence[];
+    /** The lines rules may read: see causalLines in core/cause.ts. */
+    causal: Evidence[];
     cause?: Cause;
     /** The first causal line matching `re`: see causalLines in core/cause.ts. */
     find(re: RegExp): Evidence | undefined;

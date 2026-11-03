@@ -369,7 +369,7 @@ ${hostShutdown('Heater extruder not heating at expected rate\nSee the \'verify_h
       .replace('stealthchop_threshold = 999999', 'stealthchop_threshold = 500'),
   }));
 
-// ---- Shapes seen in publicly posted logs. Rebuilt here from the message formats, never copied. ----
+// Shapes seen in publicly posted logs. Rebuilt here from the message formats, never copied.
 
 const HOST_TRACE = (exception) => `Traceback (most recent call last):
   File "/home/pi/klipper/klippy/gcode.py", line 212, in _process_commands
@@ -477,7 +477,7 @@ add('includes-save.cfg', 'An [include] and a SAVE_CONFIG block in one file, with
 add('removed-old-options.cfg', 'One option from every Config_Changes removal added in this audit', 'docs/Config_Changes.md',
   `[printer]\nkinematics: none\nmax_velocity: 300\nmax_accel: 3000\n[input_shaper]\n\n[neopixel a]\npin: PA1\ncolor_order_GRB: False\n\n[servo a]\npin: PA2\nenable: True\n\n[bed_mesh]\nmesh_min: 1, 1\nmesh_max: 2, 2\nmin_point: 1, 1\nmax_point: 2, 2\nbed_radius: 100\nradius: 100\nbed_shape: round\nsamples: 2\nsample_retract_dist: 2\nsamples_result: average\n\n[z_tilt]\nsamples: 2\n\n[extruder]\nactivate_gcode: T0\ndeactivate_gcode: T1\npressure_advance_lookahead_time: 0.01\n\n[firmware_retraction]\nz_hop: 1\n\n[skew_correction]\nxy_skew: 0.1\n\n[sx1509 a]\naddress: 62\n\n[tmc2660 stepper_x]\ndriver_VSENSE: 1\n\n[tmc2130 stepper_y]\ndriver_BLANK_TIME_SELECT: 1\n\n[endstop_phase stepper_z]\nendstop_phase: 1\n\n[display]\nlcd_type: st7567\n`);
 
-// ---- Rules added in 0.2.0. Message strings are from Klipper at the commit named in CHANGELOG.md. ----
+// Rules added in 0.2.0. Message strings are from Klipper at the commit named in CHANGELOG.md.
 
 // klippy/gcode.py _respond_error() logs a command error as a plain warning line, so each of these is
 // one line (or two, where the message has a "See the ... option" second line) in the middle of a healthy log.
@@ -580,7 +580,7 @@ configErrorLog('config-error-kinematics.log', 'Config error: kinematics could no
 configErrorLog('config-error-tmc-section.log', 'Config error: tmc driver without its stepper section', 'extras/tmc.py TMCMicrostepHelper', "configparser.Error: Could not find config section '[stepper_q]' required by tmc driver");
 configErrorLog('config-error-sensor.log', 'Config error: unknown temperature sensor', 'extras/heaters.py setup_sensor', "configparser.Error: Unknown temperature sensor 'EPCOS 100k'");
 
-// ---- Config lints added in 0.2.0 ----
+// Config lints added in 0.2.0
 
 add('pin-twice.cfg', 'A pin set on two steppers, a heater and a fan, which Klipper refuses', 'pins.py lookup_pin',
   `[mcu]\nserial: /dev/serial/by-id/usb-Klipper_example\n\n[printer]\nkinematics: cartesian\nmax_velocity: 300\nmax_accel: 3000\n\n[stepper_x]\nstep_pin: PB13\ndir_pin: PB12\nenable_pin: !PB14\nmicrosteps: 16\nrotation_distance: 40\nendstop_pin: ^PC0\nposition_endstop: 0\nposition_max: 235\n\n[stepper_y]\nstep_pin: !PB13\ndir_pin: PB2\nenable_pin: !PB14\nmicrosteps: 16\nrotation_distance: 40\nendstop_pin: ^PC1\nposition_endstop: 0\nposition_max: 235\n\n[stepper_z]\nstep_pin: mcu:PB0\ndir_pin: PC5\nmicrosteps: 16\nrotation_distance: 8\nendstop_pin: ^PC2\nposition_endstop: 0.5\nposition_max: 250\n\n[extruder]\nstep_pin: PB0\ndir_pin: PB4\nmicrosteps: 16\nrotation_distance: 33\nnozzle_diameter: 0.4\nfilament_diameter: 1.75\nheater_pin: PC8\nsensor_type: EPCOS 100K B57560G104F\nsensor_pin: PA0\ncontrol: watermark\nmin_temp: 0\nmax_temp: 250\n\n[heater_bed]\nheater_pin: PC8\nsensor_type: ATC Semitec 104GT-2\nsensor_pin: PC4\ncontrol: watermark\nmin_temp: 0\nmax_temp: 130\n\n[heater_fan hotend_fan]\npin: PC8\n\n[input_shaper]\n`);
@@ -612,8 +612,8 @@ add('kinematics-none.cfg', 'kinematics: none needs no stepper sections', 'kinema
 
 for (const [name, text] of Object.entries(files)) writeFileSync(join(out, name), text);
 
-// ---- Input that is damaged or is not what it claims to be. These are not assembled by add() because
-// they must hold exact bytes, or because the header comment would change what they test. ----
+// Input that is damaged or is not what it claims to be. These are not assembled by add() because
+// they must hold exact bytes, or because the header comment would change what they test.
 const clean = files['timer-too-close.log'];
 
 writeFileSync(join(out, 'fork-prefix.log'), clean.split('\n').map((l) => (l && !l.startsWith('#') ? `[INFO] 2026-11-01 10:00:00,000 [root] [klippy:run:265] ${l}` : l)).join('\n'));

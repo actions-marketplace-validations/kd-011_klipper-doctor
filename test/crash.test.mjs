@@ -234,8 +234,8 @@ test('rotated log: a crash before the restart is not reported as the current ses
   assert.deepEqual(ids(r.crash), ['no-failure-found']);
 });
 
-// ---- Command request is what every MCU reports after the host stops it (mcu.py _shutdown sends
-// emergency_stop, src/basecmd.c answers "Command request"). It is only the cause when nothing came before it. ----
+// Command request is what every MCU reports after the host stops it (mcu.py _shutdown sends
+// emergency_stop, src/basecmd.c answers "Command request"). It is only the cause when nothing came before it.
 
 test('Command request after a heater shutdown is the effect, not a second diagnosis', () => {
   const r = analyze(fixture('heater-then-command-request.log'));
@@ -294,7 +294,7 @@ test('text in a request dump does not fire a rule even when the log has no shutd
   assert.deepEqual(ids(r.crash), ['no-failure-found']);
 });
 
-// ---- A log with several starts: the user usually restarted Klipper before grabbing the log. ----
+// A log with several starts: the user usually restarted Klipper before grabbing the log.
 
 test('no failure in the last session, but an earlier one died: the finding says which, why and where', () => {
   const r = analyze(fixture('multi-session.log'));
@@ -337,7 +337,7 @@ test('warnings in the last session do not hide a failed earlier session', () => 
   assert.match(r.crash[1].title, /Timer too close/);
 });
 
-// ---- TMC details, against docs/TMC_Drivers.md and the field names in extras/tmc2130.py ----
+// TMC details, against docs/TMC_Drivers.md and the field names in extras/tmc2130.py
 
 test('a TMC driver that failed to init is not a crash when Klipper carried on', () => {
   const f = analyze(fixture('tmc-failed-to-init.log')).crash[0];
@@ -367,7 +367,7 @@ test('se=0(Reset?) from a tmc2660 reads as a driver reset', () => {
   assert.match(r.crash[0].detail, /reset itself/);
 });
 
-// ---- The rest of the fallback and the MCU rules ----
+// The rest of the fallback and the MCU rules
 
 test('MCU error during connect shows the message from the traceback and what to do next', () => {
   const f = analyze(fixture('connect-crc-mismatch.log')).crash[0];

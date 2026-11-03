@@ -14,7 +14,7 @@ const one = (file) => {
 const cfg = (file) => analyze(fixture(file), { filename: file }).config;
 const only = (file, id) => cfg(file).filter((f) => f.id === id);
 
-// ---- Command errors: Klipper keeps running, so they are warnings, like move-out-of-range ----
+// Command errors: Klipper keeps running, so they are warnings, like move-out-of-range
 
 test('homing-no-trigger: names the endstop and the check that finds a wrong one', () => {
   const f = one('homing-no-trigger.log');
@@ -91,7 +91,7 @@ test('a command error does not hide a later real shutdown', () => {
   assert.ok(ids(r).includes('mcu-timer-too-close'), ids(r).join());
 });
 
-// ---- MCU shutdown reasons ----
+// MCU shutdown reasons
 
 test('mcu-max-duration: says which kind of output and where the limit is documented', () => {
   const d = one('max-duration-digital.log');
@@ -117,7 +117,7 @@ test('mcu-linux-bus-open does not fire on a serial port that will not open, or o
   assert.deepEqual(ids(crash('linux-gpio-open.log')), ['crash-unknown-reason']);
 });
 
-// ---- CAN ----
+// CAN
 
 test('mcu-connect-failed: a board that answers with another uuid is told apart from a CAN port that is down', () => {
   const mismatch = one('can-uuid-mismatch.log');
@@ -135,7 +135,7 @@ test('can-uuid-invalid: says what a canbus_uuid looks like', () => {
   assert.match(f.fix, /canbus_query/);
 });
 
-// ---- Config errors Klipper raises from pins, choices and drivers ----
+// Config errors Klipper raises from pins, choices and drivers
 
 const CONFIG_ERRORS = {
   'config-error-pin-twice.log': [/PB13/, /used multiple times|more than once/i],
@@ -154,7 +154,7 @@ for (const [file, res] of Object.entries(CONFIG_ERRORS)) {
   });
 }
 
-// ---- Config lints ----
+// Config lints
 
 test('pin-used-twice: finds each repeated pin, even with ! or mcu: in front, and not a shareable one', () => {
   const found = only('pin-twice.cfg', 'pin-used-twice');

@@ -1,5 +1,5 @@
 import { KLIPPER_DOCS, KLIPPER_SRC } from '../types.js';
-// ---- pin-used-twice ----------------------------------------------------------------------------------
+// pin-used-twice
 // klippy/pins.py PrinterPins.lookup_pin(): a pin that is looked up twice raises "pin %s used multiple times in
 // config" unless both lookups pass the same share_type or the pin is in [duplicate_pin_override]. The only share
 // types in klippy/ are enable pins (extras/stepper_enable.py), TMC UART and SPI chip-select pins and the software
@@ -83,7 +83,7 @@ export const pinUsedTwice = {
         return hits;
     },
 };
-// ---- TMC drivers ----------------------------------------------------------------------------------
+// TMC drivers
 // klippy/extras/tmc.py TMCMicrostepHelper(), run for every [tmcNNNN <stepper>] section:
 //   the stepper section named after the driver type must exist ("Could not find config section ... required by
 //   tmc driver"), and its microsteps is read with getchoice() from {256, 128, 64, 32, 16, 8, 4, 2, 1}.
@@ -160,7 +160,7 @@ export const tmcStepperMissing = {
         return hits;
     },
 };
-// ---- kinematics ----------------------------------------------------------------------------------
+// kinematics
 // Each kinematics module in klippy/kinematics/ builds its steppers from fixed section names with
 // config.getsection(), and a section that is not there fails at "Option 'step_pin' in section '<name>' must be
 // specified" (the first thing the stepper reads). Names, from the modules:

@@ -263,8 +263,8 @@ test('missing-required: position_max is still required when the z endstop is the
   assert.doesNotMatch(f.title, /position_endstop/);
 });
 
-// ---- The parser against Python's configparser, which is what Klipper uses. Each expected value was
-// checked by running RawConfigParser(strict=False, inline_comment_prefixes=(';', '#')) on the input. ----
+// The parser against Python's configparser, which is what Klipper uses. Each expected value was
+// checked by running RawConfigParser(strict=False, inline_comment_prefixes=(';', '#')) on the input.
 
 const parsesCleanly = (text) =>
   analyze(`[printer]\nkinematics: none\nmax_velocity: 1\nmax_accel: 1\n[input_shaper]\n${text}`).config.length === 0;
@@ -335,7 +335,7 @@ test('BOM in a printer.cfg: the first section is read, and the report says Klipp
   assert.equal(errs[0].evidence[0].line, 1);
 });
 
-// ---- False errors: a file Klipper accepts must not produce an error. ----
+// False errors: a file Klipper accepts must not produce an error.
 
 test('a fragment with no [printer] is not told it is missing [printer] options', () => {
   const r = analyze(fixture('fragment.cfg'), { filename: 'fragment.cfg' });
@@ -393,7 +393,7 @@ test('endstop-range does not accept hex, which Python float() rejects', () => {
   assert.ok(!ids(r.config).includes('endstop-range'));
 });
 
-// ---- Config_Changes.md, read in full on this audit ----
+// Config_Changes.md
 
 test('removed-option covers every older removal that names an option', () => {
   const r = analyze(fixture('removed-old-options.cfg'), { filename: 'printer.cfg' });

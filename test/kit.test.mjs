@@ -145,6 +145,7 @@ test('kit files carry no private detail and no em dashes', () => {
   for (const f of files) {
     const t = read(f);
     assert.doesNotMatch(t, /—/, `${f}: em dash`);
+    // In pieces, so a search of this repo for these words finds nothing.
     assert.doesNotMatch(t, new RegExp(['ky' + 'le', 'de' + 'boo', 'gmail', '/home/', 'cor' + 'tex', 'Co-Authored-By'].join('|'), 'i'), `${f}: private detail`);
   }
 });

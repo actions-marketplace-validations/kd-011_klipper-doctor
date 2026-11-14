@@ -6,6 +6,10 @@ All notable changes to this project are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-11-14
+
+No change to what the tool reports. This release is the first published through npm trusted publishing, with no stored token, and it carries the comment cleanup and dependency bumps made since 0.5.0.
+
 ## [0.5.0] - 2026-11-03
 
 From reading 80 help threads on the Klipper forum against the report. The method and the results are in [docs/accuracy.md](docs/accuracy.md).

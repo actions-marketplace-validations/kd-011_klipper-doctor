@@ -1,6 +1,6 @@
 {
   "name": "klipper-doctor",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "description": "Reads a klippy.log or printer.cfg and says in plain English why Klipper stopped and what to try next.",
   "keywords": [
     "klipper",

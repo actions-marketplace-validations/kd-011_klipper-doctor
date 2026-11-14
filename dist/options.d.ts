@@ -1,5 +1,5 @@
-export declare const FORMATS: readonly ["text", "json", "md", "github"];
-export declare const SHELLS: readonly ["bash", "zsh", "fish"];
+export declare const FORMATS: readonly ['text', 'json', 'md', 'github'];
+export declare const SHELLS: readonly ['bash', 'zsh', 'fish'];
 export declare const DEFAULT_KEY_VAR = "MOONRAKER_API_KEY";
 export interface CliOption {
     /** Long name first, then any short alias. */

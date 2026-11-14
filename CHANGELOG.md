@@ -6,7 +6,7 @@ All notable changes to this project are listed here. The format follows
 
 ## [Unreleased]
 
-## [0.5.1] - 2026-11-14
+## [0.5.2] - 2026-11-14
 
 No change to what the tool reports. This release is the first published through npm trusted publishing, with no stored token, and it carries the comment cleanup and dependency bumps made since 0.5.0.
 
